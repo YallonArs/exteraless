@@ -43,6 +43,9 @@ import app.exteraless.plugins.PluginInstallHelper;
 import app.exteraless.plugins.PluginsController;
 import app.exteraless.plugins.PythonPluginsEngine;
 import app.exteraless.plugins.PluginsWatchdog;
+import app.exteraless.plugins.ui.components.PluginCell;
+import app.exteraless.plugins.ui.components.PluginCellDelegate;
+import app.exteraless.plugins.ui.components.PluginPermissionsDelegate;
 
 /**
  * Экран «Plugins». Порт
@@ -185,10 +188,8 @@ public class PluginsActivity extends BaseFragment {
             items.add(PluginUiItem.fullscreen(emptyCell, dp(74), true));
             return;
         }
-        boolean compact = controller.isCompactView();
         for (Plugin plugin : visible) {
-            items.add(PluginCell.Factory.of(plugin, controller.isPluginPinned(plugin.id),
-                    compact, cellDelegate));
+            items.add(PluginCell.Factory.asPlugin(plugin, new PluginRowDelegate(plugin)));
         }
     }
 
@@ -225,19 +226,26 @@ public class PluginsActivity extends BaseFragment {
      * Кнопки под описанием плагина. Раньше всё это жило в меню по долгому
      * нажатию: пункт, о существовании которого нельзя догадаться.
      */
-    private final PluginCell.Delegate cellDelegate = new PluginCell.Delegate() {
-        @Override
-        public void onToggle(Plugin plugin) {
-            togglePlugin(plugin);
+    private final class PluginRowDelegate implements PluginCellDelegate, PluginPermissionsDelegate {
+
+        private final Plugin plugin;
+
+        PluginRowDelegate(Plugin plugin) {
+            this.plugin = plugin;
         }
 
         @Override
-        public void onShare(Plugin plugin) {
-            sharePlugin(plugin);
+        public void togglePlugin(View view) {
+            PluginsActivity.this.togglePlugin(plugin);
         }
 
         @Override
-        public void onPin(Plugin plugin) {
+        public void sharePlugin() {
+            PluginsActivity.this.sharePlugin(plugin);
+        }
+
+        @Override
+        public void pinPlugin(View view) {
             PluginsController controller = PluginsController.getInstance();
             boolean pinned = !controller.isPluginPinned(plugin.id);
             controller.setPluginPinned(plugin.id, pinned);
@@ -252,20 +260,29 @@ public class PluginsActivity extends BaseFragment {
         }
 
         @Override
-        public void onSettings(Plugin plugin) {
+        public void openPluginSettings() {
             PythonPluginsEngine.getInstance().openPluginSettings(plugin, PluginsActivity.this);
         }
 
         @Override
-        public void onPermissions(Plugin plugin) {
+        public void openPluginPermissions() {
             presentFragment(new PluginPermissionsActivity(plugin.id));
         }
 
         @Override
-        public void onDelete(Plugin plugin) {
+        public void deletePlugin() {
             showDeleteDialog(plugin);
         }
-    };
+
+        @Override
+        public void openInExternalApp() {
+        }
+
+        @Override
+        public boolean canOpenInExternalApp() {
+            return false;
+        }
+    }
 
     /**
      * Отдать файл плагина наружу.
@@ -394,9 +411,10 @@ public class PluginsActivity extends BaseFragment {
         if (activity == null) {
             return;
         }
-        StringBuilder message = new StringBuilder();
+        SpannableStringBuilder message = new SpannableStringBuilder();
         if (!TextUtils.isEmpty(plugin.description)) {
-            message.append(plugin.description).append("\n\n");
+            message.append(com.exteragram.messenger.utils.text.LocaleUtils
+                    .fullyFormatText(plugin.description)).append("\n\n");
         }
         message.append(plugin.getSubtitle());
         if (plugin.requirements != null && !plugin.requirements.isEmpty()) {
@@ -408,7 +426,7 @@ public class PluginsActivity extends BaseFragment {
         }
         AlertDialog.Builder builder = new AlertDialog.Builder(activity)
                 .setTitle(plugin.getDisplayName())
-                .setMessage(message.toString())
+                .setMessage(message)
                 .setPositiveButton(getString(R.string.OK), null);
         // Разбираться с падением будет автор плагина в другом чате — отдаём
         // ему traceback целиком, а на экране оставляем короткую строку.

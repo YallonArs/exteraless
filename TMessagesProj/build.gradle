@@ -36,6 +36,8 @@ if (properties != null) {
     pwd = properties.getProperty('ALIAS_PASS')
 }
 
+def chaquopyBuildPython = properties?.getProperty('CHAQUOPY_BUILD_PYTHON') ?: System.getenv('CHAQUOPY_BUILD_PYTHON')
+
 keystorePwd = keystorePwd ?: System.getenv('KEYSTORE_PASS')
 alias = alias ?: System.getenv('ALIAS_NAME')
 pwd = pwd ?: System.getenv('ALIAS_PASS')
@@ -114,9 +116,10 @@ android {
         }
 
         python {
-            // 3.12 (not docs' 3.11): Chaquopy requires the build host to have the same
-            // minor version for byte-compilation, and this machine has 3.12 only.
-            version '3.12'
+            version '3.11'
+            if (chaquopyBuildPython != null && !chaquopyBuildPython.isBlank()) {
+                buildPython chaquopyBuildPython
+            }
             pip {
                 install 'beautifulsoup4'
                 install 'debugpy'

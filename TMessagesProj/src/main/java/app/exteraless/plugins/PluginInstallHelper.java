@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 
@@ -223,13 +224,29 @@ public final class PluginInstallHelper {
         controller.readMetadataAsync(file, plugin -> {
             // Разбор исходника — на фоновом потоке: это чтение файла и AST.
             final Map<String, List<String>> capabilities = PluginCapabilityScan.scan(file);
+            final Map<String, List<String>> offered = offeredPermissions(plugin, capabilities);
             AndroidUtilities.runOnUIThread(() -> {
                 if (activity.isFinishing()) {
                     return;
                 }
-                showConsentSheet(activity, file, plugin, capabilities);
+                showConsentSheet(activity, file, plugin, offered, capabilities);
             });
         });
+    }
+
+    private static Map<String, List<String>> offeredPermissions(
+            Plugin plugin, Map<String, List<String>> capabilities) {
+        if (!capabilities.isEmpty()) {
+            return capabilities;
+        }
+        List<String> fallback = plugin != null && plugin.permissionsDeclared
+                ? PluginPermissions.getRequested(plugin)
+                : PluginPermissions.REQUESTABLE;
+        Map<String, List<String>> offered = new LinkedHashMap<>();
+        for (String permission : PluginPermissions.sanitize(fallback)) {
+            offered.put(permission, java.util.Collections.emptyList());
+        }
+        return offered;
     }
 
     /**
@@ -244,8 +261,9 @@ public final class PluginInstallHelper {
      * отметили переписывание кода — «Доверенный».
      */
     private static void showConsentSheet(Activity activity, File file, Plugin plugin,
+                                         Map<String, List<String>> offered,
                                          Map<String, List<String>> capabilities) {
-        new PluginInstallSheet(activity, file, plugin, capabilities,
+        new PluginInstallSheet(activity, file, plugin, offered,
                 (granted, enableAfterInstall) -> {
                     grantOnConsent(plugin, granted);
                     if (plugin != null && plugin.id != null) {

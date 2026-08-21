@@ -11,6 +11,14 @@ import java.util.List;
  */
 public class Plugin extends com.exteragram.messenger.plugins.Plugin {
 
+    public Plugin() {
+    }
+
+    public Plugin(String id, String name) {
+        this.id = id;
+        this.name = name;
+    }
+
     @Override
     public String getId() {
         return id;
@@ -24,6 +32,7 @@ public class Plugin extends com.exteragram.messenger.plugins.Plugin {
     public String version = "1.0";
     /** StickerPackShortName/index, например "exteraPlugins/1". */
     public String icon;
+    public String engine = PluginsConstants.PYTHON;
     public String appVersion;
     public String sdkVersion;
     public boolean beta;
@@ -71,7 +80,43 @@ public class Plugin extends com.exteragram.messenger.plugins.Plugin {
      * блока падает с AttributeError.
      */
     public String getEngine() {
-        return PluginsConstants.PYTHON;
+        return engine;
+    }
+
+    public void setEngine(String value) {
+        engine = value;
+    }
+
+    public void setName(String value) {
+        name = value;
+    }
+
+    public void setDescription(String value) {
+        description = value;
+    }
+
+    public void setAuthor(String value) {
+        author = value;
+    }
+
+    public void setVersion(String value) {
+        version = value;
+    }
+
+    public void setIcon(String value) {
+        icon = value;
+    }
+
+    public void setAppVersion(String value) {
+        appVersion = value;
+    }
+
+    public void setSdkVersion(String value) {
+        sdkVersion = value;
+    }
+
+    public void setRequirements(List<String> value) {
+        requirements = value == null ? new ArrayList<>() : new ArrayList<>(value);
     }
 
     public String getName() {

@@ -36,6 +36,7 @@ REFMAP_CANDIDATES = ("refmap.yaml", "refmap.yml", "refmap.json")
 METAINFO_CANDIDATES = ("metainfo.yaml", "metainfo.yml", "metainfo.json")
 
 EXTRACTED_DIRNAME = ".elyx_extracted"
+REFERENCE_DIRNAME = "ElyxPlugins"
 LOCAL_LIBS_DIRNAME = "elyx_local_libs"
 _COMPLETE_MARKER = ".elyx_complete"
 _WHEEL_MARKER = ".elyx_wheel_complete"
@@ -172,6 +173,7 @@ def extract_archive(path: str, plugins_dir: str, plugin_id: str) -> Tuple[str, s
     dest = os.path.join(base, stamp)
     marker = os.path.join(dest, _COMPLETE_MARKER)
     if os.path.isfile(marker):
+        _link_reference_dir(plugins_dir, plugin_id, dest)
         return digest, dest
 
     os.makedirs(base, exist_ok=True)
@@ -188,7 +190,40 @@ def extract_archive(path: str, plugins_dir: str, plugin_id: str) -> Tuple[str, s
     except Exception:
         shutil.rmtree(tmp, ignore_errors=True)
         raise
+    _link_reference_dir(plugins_dir, plugin_id, dest)
     return digest, dest
+
+
+def reference_dir(plugins_dir: str, plugin_id: str) -> str:
+    return os.path.join(plugins_dir, REFERENCE_DIRNAME, plugin_id)
+
+
+def _link_reference_dir(plugins_dir: str, plugin_id: str, dest: str) -> None:
+    link = reference_dir(plugins_dir, plugin_id)
+    try:
+        os.makedirs(os.path.dirname(link), exist_ok=True)
+        if os.path.realpath(link) == os.path.realpath(dest):
+            return
+        tmp_link = link + f".tmp{os.getpid()}"
+        _drop_path(tmp_link)
+        os.symlink(dest, tmp_link)
+        os.replace(tmp_link, link)
+    except OSError:
+        _drop_path(link)
+        try:
+            shutil.copytree(dest, link)
+        except OSError:
+            pass
+
+
+def _drop_path(path: str) -> None:
+    if os.path.islink(path) or os.path.isfile(path):
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+    else:
+        shutil.rmtree(path, ignore_errors=True)
 
 
 def cleanup_stale_extractions(plugins_dir: str, plugin_id: str, keep_digest: str) -> None:
@@ -208,6 +243,7 @@ def purge_plugin_dirs(plugins_dir: str, plugin_id: str) -> None:
                   ignore_errors=True)
     shutil.rmtree(os.path.join(plugins_dir, LOCAL_LIBS_DIRNAME, plugin_id),
                   ignore_errors=True)
+    _drop_path(reference_dir(plugins_dir, plugin_id))
 
 
 # Bundled wheels

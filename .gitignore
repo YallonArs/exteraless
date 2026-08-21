@@ -20,3 +20,4 @@ __pycache__/
 
 # Ключ подписи
 TMessagesProj/release.keystore
+tests/local/

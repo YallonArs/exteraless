@@ -447,13 +447,14 @@ _JAVA_CLASS_DENIED = frozenset({
     "app.exteraless.plugins.PluginsWatchdog",
     "app.exteraless.plugins.PluginRuntime",
     "app.exteraless.plugins.PluginServices",
-    "app.exteraless.plugins.PluginAuditLog",
+    "app.exteraless.plugins.PluginAuditJournal",
     "app.exteraless.plugins.PluginDenialNotice",
     "app.exteraless.plugins.files.FilesControllerJava",
     "app.exteraless.plugins.intents.IntentsDispatcher",
     "app.exteraless.plugins.menus.MenusController",
     "java.lang.Runtime",
     "java.lang.ProcessBuilder",
+    "java.lang.Process",
 })
 
 

@@ -24,6 +24,20 @@ def _bridge():
     return _bridge_cache
 
 
+_services_cache = _BRIDGE_UNSET
+
+
+def _services():
+    global _services_cache
+    if _services_cache is _BRIDGE_UNSET:
+        try:
+            from app.exteraless.plugins import PluginServices
+            _services_cache = PluginServices
+        except Exception:
+            _services_cache = None
+    return _services_cache
+
+
 def log(data):
     """Log a value into the app's plugin pipeline (plugin id "sdk").
 
@@ -118,11 +132,11 @@ def run_on_ui_thread(func, delay=0):
     времени плагин успели перезагрузить, разворот падает NotImplementedError
     прямо в UI-потоке и роняет приложение — поймать это из python нечем.
     """
-    from java import jclass
-
     if func is None:
         return
-    services = jclass("app.exteraless.plugins.PluginServices")
+    services = _services()
+    if services is None:
+        raise ImportError("app.exteraless.plugins.PluginServices is unavailable")
     services.runOnUiThread(lambda: safe_call(func), int(delay or 0))
 
 

@@ -22,6 +22,7 @@ import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.CheckBox2;
 import org.telegram.ui.Components.LayoutHelper;
+import org.telegram.ui.Components.LinkSpanDrawable;
 import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
 
 import java.io.File;
@@ -93,11 +94,13 @@ public class PluginInstallSheet extends BottomSheet {
                 LayoutHelper.WRAP_CONTENT, 21, 4, 21, 0));
 
         if (plugin != null && !TextUtils.isEmpty(plugin.description)) {
-            TextView description = new TextView(context);
+            LinkSpanDrawable.LinksTextView description =
+                    new LinkSpanDrawable.LinksTextView(context);
             description.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
             description.setTextColor(Theme.getColor(Theme.key_dialogTextBlack));
             description.setGravity(Gravity.CENTER);
-            description.setText(plugin.description);
+            description.setText(com.exteragram.messenger.utils.text.LocaleUtils
+                    .fullyFormatText(plugin.description));
             content.addView(description, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT,
                     LayoutHelper.WRAP_CONTENT, 21, 18, 21, 0));
         }

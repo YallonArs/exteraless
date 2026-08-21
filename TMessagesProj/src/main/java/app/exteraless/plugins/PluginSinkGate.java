@@ -65,7 +65,8 @@ public final class PluginSinkGate {
             "app.exteraless.plugins.PluginsWatchdog",
             "app.exteraless.plugins.PluginRuntime",
             "app.exteraless.plugins.PluginServices",
-            "app.exteraless.plugins.PluginAuditLog",
+            "app.exteraless.plugins.PluginAuditJournal",
+            "app.exteraless.plugins.PluginDenialNotice",
             "app.exteraless.plugins.files.FilesControllerJava",
             "app.exteraless.plugins.intents.IntentsDispatcher",
             "app.exteraless.plugins.menus.MenusController",
@@ -223,7 +224,7 @@ public final class PluginSinkGate {
                     }
                 }
                 for (String loader : CODE_LOADING_CLASSES) {
-                    if (name.equals(loader)) {
+                    if (matchesClassName(name, loader)) {
                         if (!PluginPermissions.check(pluginId, PluginPermissions.HOOKS)) {
                             deny(pluginId, event, "native", name,
                                     "missing the 'hooks' permission", param);
@@ -234,8 +235,7 @@ public final class PluginSinkGate {
                     }
                 }
                 for (String prefix : NETWORK_CLASSES) {
-                    boolean match = prefix.endsWith(".") ? name.startsWith(prefix) : name.equals(prefix);
-                    if (!match) {
+                    if (!matchesClassName(name, prefix)) {
                         continue;
                     }
                     if (!PluginPermissions.check(pluginId, PluginPermissions.NETWORK)) {
@@ -786,11 +786,18 @@ public final class PluginSinkGate {
     /** Загрузчики кода: требуют hooks, а не «никогда». */
     static boolean isCodeLoader(String className) {
         for (String loader : CODE_LOADING_CLASSES) {
-            if (loader.equals(className)) {
+            if (matchesClassName(className, loader)) {
                 return true;
             }
         }
         return false;
+    }
+
+    static boolean matchesClassName(String name, String pattern) {
+        if (name == null || pattern == null) {
+            return false;
+        }
+        return pattern.endsWith(".") ? name.startsWith(pattern) : name.equals(pattern);
     }
 
     private static String describe(XC_MethodHook.MethodHookParam param) {
