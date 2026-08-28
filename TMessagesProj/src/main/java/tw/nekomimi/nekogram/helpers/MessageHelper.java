@@ -865,6 +865,42 @@ public class MessageHelper extends BaseController {
         return text.toString();
     }
 
+    public static CharSequence getMessagePlainTextFullWithUrls(MessageObject messageObject, MessageObject.GroupedMessages messageGroup) {
+        CharSequence plainText = getMessagePlainTextFull(messageObject, messageGroup);
+        if (plainText == null) {
+            return null;
+        }
+
+        ArrayList<TLRPC.MessageEntity> entities = messageObject.messageOwner.entities;
+        if (entities == null || entities.isEmpty()) {
+            return plainText; 
+        }
+
+        StringBuilder builder = new StringBuilder(plainText);
+
+        // iterate through entities in REVERSE order to prevent shifing index offsent. 
+        for (int i = entities.size() - 1; i >= 0; i--) {
+            TLRPC.MessageEntity entity = entities.get(i);
+            
+            // check if the entity is a hidden URL
+            if (entity instanceof TLRPC.TL_messageEntityTextUrl) {
+                String targetUrl = entity.url; // the underlying target URL
+                
+                if (targetUrl != null) {
+                    // determine exactly where the link text ends
+                    int insertPosition = entity.offset + entity.length;
+                    
+                    // insert the URL right after the formatted text
+                    // example output: "Check out this link (https://example.com) for details."
+                    builder.insert(insertPosition, " (" + targetUrl + ")");
+                }
+            }
+        }
+
+        return builder.toString();
+    }
+
+
     public static boolean messageObjectIsFile(int type, MessageObject messageObject) {
         boolean canSave = (type == 4 || type == 5 || type == 6 || type == 10);
         boolean downloading = messageObject.loadedFileSize > 0;
