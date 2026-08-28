@@ -101,8 +101,11 @@ final class FeedMessageIdentityMap {
     }
 
     public void clear() {
+        generatedIds.clear();
+        realIdsByGeneratedId.clear();
         messagesByRealId.clear();
         primaryByGroup.clear();
+        lastGeneratedId = FIRST_GENERATED_ID;
     }
 
     /**

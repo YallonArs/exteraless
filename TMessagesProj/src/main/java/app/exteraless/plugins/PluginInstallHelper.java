@@ -234,17 +234,30 @@ public final class PluginInstallHelper {
         });
     }
 
+    /**
+     * Что показать галочками.
+     *
+     * Обычный плагин спрашивает по уликам разбора. У обфусцированного улик нет
+     * по построению — имена переписаны, ни один маркер не совпадает, — и
+     * короткий список читался бы как «плагин почти ничего не умеет». Поэтому
+     * для него перечисляем всё: разбор не смог сказать ничего, решает человек.
+     */
     private static Map<String, List<String>> offeredPermissions(
             Plugin plugin, Map<String, List<String>> capabilities) {
-        if (!capabilities.isEmpty()) {
+        final boolean obfuscated = PluginCapabilityScan.isObfuscated(capabilities);
+        if (!capabilities.isEmpty() && !obfuscated) {
             return capabilities;
         }
-        List<String> fallback = plugin != null && plugin.permissionsDeclared
+        List<String> fallback = !obfuscated && plugin != null && plugin.permissionsDeclared
                 ? PluginPermissions.getRequested(plugin)
                 : PluginPermissions.REQUESTABLE;
         Map<String, List<String>> offered = new LinkedHashMap<>();
         for (String permission : PluginPermissions.sanitize(fallback)) {
-            offered.put(permission, java.util.Collections.emptyList());
+            offered.put(permission, PluginCapabilityScan.evidenceOf(capabilities, permission));
+        }
+        if (obfuscated) {
+            offered.put(PluginCapabilityScan.KEY_OBFUSCATION,
+                    PluginCapabilityScan.obfuscationEvidence(capabilities));
         }
         return offered;
     }
@@ -312,7 +325,7 @@ public final class PluginInstallHelper {
         progress.setMessage(LocaleController.getString(R.string.PluginsInstalling));
         progress.setCanCancel(false);
         progress.show();
-        PluginsController.getInstance().installPlugin(file, (ok, error, plugin) ->
+        PluginsController.getInstance().installPlugin(file, enableAfterInstall, (ok, error, plugin) ->
                 AndroidUtilities.runOnUIThread(() -> {
                     try {
                         progress.dismiss();
@@ -322,6 +335,17 @@ public final class PluginInstallHelper {
                         return;
                     }
                     if (!ok) {
+                        Plugin registered = plugin;
+                        if (registered == null && consentedId != null) {
+                            registered = PluginsController.getInstance().getPlugin(consentedId);
+                        }
+                        if (enableAfterInstall && isPermissionDenial(error)
+                                && registered != null && registered.id != null) {
+                            PluginsController.getInstance().setPluginEnabled(registered.id, true);
+                            showError(activity, humanError(error, consentedId),
+                                    plugin == null ? null : plugin.loadDebug);
+                            return;
+                        }
                         // Установка сорвалась — согласие, записанное авансом, ни к чему
                         // не относится. Стираем, но только если плагина и правда нет:
                         // при перезаписи существующего файл мог уже подмениться.
@@ -352,14 +376,22 @@ public final class PluginInstallHelper {
      * Остальные ошибки оставляем как есть: там текст обычно и есть суть
      * (битый архив, нет метаданных), а прятать её было бы хуже.
      */
+    private static boolean isPermissionDenial(CharSequence error) {
+        if (error == null) {
+            return false;
+        }
+        String text = error.toString();
+        return text.contains("PermissionError") || text.contains("missing the");
+    }
+
     private static CharSequence humanError(CharSequence error, String pluginId) {
         if (error == null) {
             return LocaleController.getString(R.string.PluginsInstallError);
         }
-        String text = error.toString();
-        if (!text.contains("PermissionError") && !text.contains("missing the")) {
+        if (!isPermissionDenial(error)) {
             return error;
         }
+        String text = error.toString();
         String permission = null;
         for (String candidate : PluginPermissions.ALL) {
             if (text.contains("'" + candidate + "'")) {

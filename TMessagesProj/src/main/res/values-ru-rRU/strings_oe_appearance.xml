@@ -39,6 +39,7 @@
     <string name="OEAppearanceDisableAvatarBlur">Отключить размытие аватарок</string>
     <string name="OEAppearanceBlurInfo">Размытие будет применяться ко всем темам, независимо от их настроек.</string>
 
+    <string name="OEAppearanceRestartNow">Перезапустить</string>
     <string name="OEAppearanceNeedRestart">Перезапустите приложение, чтобы применить настройку.</string>
 
     <string name="OEAppearanceMaterialDesign3" translatable="false">Material Design 3</string>
@@ -101,9 +102,16 @@
     <string name="OEAppearanceNewLoadingStyle">Стиль загрузки</string>
     <string name="OEAppearanceNewChatHeaderStyle">Шапка чата</string>
     <string name="OEAppearanceNewNavigationBarStyle">Нижняя панель навигации</string>
+    <string name="OEAppearanceIosDesign" translatable="false">iOS Design</string>
+    <string name="OEAppearanceIosNavigationBarStyle">Нижняя панель навигации</string>
+    <string name="OEAppearanceIosBackCounter">Счётчик рядом со стрелкой</string>
+    <string name="OEAppearanceIosFirstFolderOnTabTap">Тап по вкладке — первая папка</string>
     <string name="OEAppearanceHideActionBarStatus">Скрыть статус</string>
     <string name="OEAppearanceHideAi">Скрыть AI</string>
     <string name="OEAppearanceHideAiEditor">Кнопка AI-редактора</string>
     <string name="OEAppearanceHideAiSummary">Кнопка саммари сообщения</string>
     <string name="OEAppearanceHideAiIv">Саммари в Instant View</string>
+    <string name="OEAppearanceTabCounterAll">Все чаты</string>
+    <string name="OEAppearanceTabCounterUnmuted">Кроме чатов без звука</string>
+    <string name="OEAppearanceTabCounterOff">Выключен</string>
 </resources>

@@ -125,26 +125,26 @@ public class UniversalFragment extends org.telegram.ui.Components.UniversalFragm
     }
 
     @Override
-    protected CharSequence getTitle() {
+    public CharSequence getTitle() {
         return delegate == null ? null : delegate.getTitle();
     }
 
     @Override
-    protected void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
+    public void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
         if (delegate != null) {
             delegate.fillItems(items, adapter);
         }
     }
 
     @Override
-    protected void onClick(UItem item, View view, int position, float x, float y) {
+    public void onClick(UItem item, View view, int position, float x, float y) {
         if (delegate != null) {
             delegate.onClick(item, view, position, x, y);
         }
     }
 
     @Override
-    protected boolean onLongClick(UItem item, View view, int position, float x, float y) {
+    public boolean onLongClick(UItem item, View view, int position, float x, float y) {
         return delegate != null && delegate.onLongClick(item, view, position, x, y);
     }
 

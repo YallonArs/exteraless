@@ -101,7 +101,7 @@ def _plugin_json(p):
 
 def _cmd_get_plugins(request):
     controller = _controller()
-    return {"plugins": [_plugin_json(p) for p in list(controller.getPlugins())]}
+    return {"plugins": [_plugin_json(p) for p in list(controller.getPluginsSnapshot())]}
 
 
 def _require_plugin_id(request) -> str:

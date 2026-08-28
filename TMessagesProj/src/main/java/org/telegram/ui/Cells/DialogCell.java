@@ -360,6 +360,13 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
 
     private CommunityArrowDrawable communityArrowDrawable;
 
+    public static class ThumbnailSpan extends FixedWidthSpan {
+
+        public ThumbnailSpan(int w) {
+            super(w);
+        }
+    }
+
     public static class FixedWidthSpan extends ReplacementSpan {
 
         private int width;
@@ -1885,10 +1892,10 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                                     SpannableStringBuilder builder = (SpannableStringBuilder) messageString;
                                     if (thumbInsertIndex >= builder.length()) {
                                         builder.append(" ");
-                                        builder.setSpan(new FixedWidthSpan(dp(thumbsCount * (thumbSize + 2) - 2 + 5)), builder.length() - 1, builder.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                                        builder.setSpan(new ThumbnailSpan(dp(thumbsCount * (thumbSize + 2) - 2 + 5)), builder.length() - 1, builder.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                                     } else {
                                         builder.insert(thumbInsertIndex, " ");
-                                        builder.setSpan(new FixedWidthSpan(dp(thumbsCount * (thumbSize + 2) - 2 + 5)), thumbInsertIndex, thumbInsertIndex + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                                        builder.setSpan(new ThumbnailSpan(dp(thumbsCount * (thumbSize + 2) - 2 + 5)), thumbInsertIndex, thumbInsertIndex + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                                     }
                                 }
                             } else {
@@ -2083,7 +2090,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                                     checkMessage = false;
                                     SpannableStringBuilder builder = (SpannableStringBuilder) messageString;
                                     builder.insert(0, " ");
-                                    builder.setSpan(new FixedWidthSpan(dp((thumbSize + 2) * thumbsCount - 2 + 5)), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                                    builder.setSpan(new ThumbnailSpan(dp((thumbSize + 2) * thumbsCount - 2 + 5)), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                                     Emoji.replaceEmoji(builder, Theme.dialogs_messagePaint[paintIndex].getFontMetricsInt(), false);
                                     if (message.hasHighlightedWords()) {
                                         CharSequence s = AndroidUtilities.highlightText(builder, message.highlightedWords, resourcesProvider);
@@ -2797,7 +2804,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 messageNameString = null;
                 currentMessagePaint = Theme.dialogs_messagePaint[paintIndex];
             } else if (!useForceThreeLines && !SharedConfig.useThreeLinesLayout || hasTags() || messageNameString != null || ChatObject.isMonoForum(chat) && ChatObject.canManageMonoForum(currentAccount, chat)) {
-                if (!isForumCell() && messageString instanceof Spanned && ((Spanned) messageString).getSpans(0, messageString.length(), FixedWidthSpan.class).length <= 0) {
+                if (!isForumCell() && messageString instanceof Spanned && ((Spanned) messageString).getSpans(0, messageString.length(), ThumbnailSpan.class).length <= 0) {
                     messageStringFinal = TextUtils.ellipsize(messageString, currentMessagePaint, messageWidth - dp(12 + (thumbsCount * (thumbSize + 2) - 2) + 5), TextUtils.TruncateAt.END);
                 } else {
                     messageStringFinal = TextUtils.ellipsize(messageString, currentMessagePaint, messageWidth - dp(12), TextUtils.TruncateAt.END);
@@ -3042,7 +3049,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             try {
                 CharSequence text = layout.getText();
                 if (text instanceof Spanned) {
-                    FixedWidthSpan[] spans = ((Spanned) text).getSpans(0, text.length(), FixedWidthSpan.class);
+                    ThumbnailSpan[] spans = ((Spanned) text).getSpans(0, text.length(), ThumbnailSpan.class);
                     if (spans != null && spans.length > 0) {
                         int spanOffset = ((Spanned) text).getSpanStart(spans[0]);
                         if (spanOffset < 0) {
@@ -3075,7 +3082,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         if (thumbsCount > 0) {
             SpannableStringBuilder builder = SpannableStringBuilder.valueOf(string);
             builder.insert(0, " ");
-            builder.setSpan(new FixedWidthSpan(dp((thumbSize + 2) * thumbsCount - 2 + 5)), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            builder.setSpan(new ThumbnailSpan(dp((thumbSize + 2) * thumbsCount - 2 + 5)), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             return builder;
         }
         return string;
@@ -4043,14 +4050,14 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 canvas.drawRect(tx - dp(8), 0, getMeasuredWidth(), getMeasuredHeight(), Theme.dialogs_pinnedPaint);
                 if (currentRevealProgress == 0) {
                     if (Theme.dialogs_archiveDrawableRecolored) {
-                        Theme.dialogs_archiveDrawable.setLayerColor("Arrow.**", Theme.getNonAnimatedColor(Theme.key_chats_archiveBackground));
+                        Theme.dialogs_archiveDrawable.setLayerColor("Arrow", Theme.getNonAnimatedColor(Theme.key_chats_archiveBackground));
                         Theme.dialogs_archiveDrawableRecolored = false;
                     }
                     if (Theme.dialogs_hidePsaDrawableRecolored) {
                         Theme.dialogs_hidePsaDrawable.beginApplyLayerColors();
-                        Theme.dialogs_hidePsaDrawable.setLayerColor("Line 1.**", Theme.getNonAnimatedColor(Theme.key_chats_archiveBackground));
-                        Theme.dialogs_hidePsaDrawable.setLayerColor("Line 2.**", Theme.getNonAnimatedColor(Theme.key_chats_archiveBackground));
-                        Theme.dialogs_hidePsaDrawable.setLayerColor("Line 3.**", Theme.getNonAnimatedColor(Theme.key_chats_archiveBackground));
+                        Theme.dialogs_hidePsaDrawable.setLayerColor("Line 1", Theme.getNonAnimatedColor(Theme.key_chats_archiveBackground));
+                        Theme.dialogs_hidePsaDrawable.setLayerColor("Line 2", Theme.getNonAnimatedColor(Theme.key_chats_archiveBackground));
+                        Theme.dialogs_hidePsaDrawable.setLayerColor("Line 3", Theme.getNonAnimatedColor(Theme.key_chats_archiveBackground));
                         Theme.dialogs_hidePsaDrawable.commitApplyLayerColors();
                         Theme.dialogs_hidePsaDrawableRecolored = false;
                     }
@@ -4071,14 +4078,14 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 canvas.restore();
 
                 if (!Theme.dialogs_archiveDrawableRecolored) {
-                    Theme.dialogs_archiveDrawable.setLayerColor("Arrow.**", Theme.getNonAnimatedColor(Theme.key_chats_archivePinBackground));
+                    Theme.dialogs_archiveDrawable.setLayerColor("Arrow", Theme.getNonAnimatedColor(Theme.key_chats_archivePinBackground));
                     Theme.dialogs_archiveDrawableRecolored = true;
                 }
                 if (!Theme.dialogs_hidePsaDrawableRecolored) {
                     Theme.dialogs_hidePsaDrawable.beginApplyLayerColors();
-                    Theme.dialogs_hidePsaDrawable.setLayerColor("Line 1.**", Theme.getNonAnimatedColor(Theme.key_chats_archivePinBackground));
-                    Theme.dialogs_hidePsaDrawable.setLayerColor("Line 2.**", Theme.getNonAnimatedColor(Theme.key_chats_archivePinBackground));
-                    Theme.dialogs_hidePsaDrawable.setLayerColor("Line 3.**", Theme.getNonAnimatedColor(Theme.key_chats_archivePinBackground));
+                    Theme.dialogs_hidePsaDrawable.setLayerColor("Line 1", Theme.getNonAnimatedColor(Theme.key_chats_archivePinBackground));
+                    Theme.dialogs_hidePsaDrawable.setLayerColor("Line 2", Theme.getNonAnimatedColor(Theme.key_chats_archivePinBackground));
+                    Theme.dialogs_hidePsaDrawable.setLayerColor("Line 3", Theme.getNonAnimatedColor(Theme.key_chats_archivePinBackground));
                     Theme.dialogs_hidePsaDrawable.commitApplyLayerColors();
                     Theme.dialogs_hidePsaDrawableRecolored = true;
                 }

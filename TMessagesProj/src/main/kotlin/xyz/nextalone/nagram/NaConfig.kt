@@ -12,7 +12,7 @@ import org.telegram.messenger.SharedConfig
 import tw.nekomimi.nekogram.NekoConfig
 import tw.nekomimi.nekogram.config.ConfigItem
 import tw.nekomimi.nekogram.config.ConfigItemKeyLinked
-import tw.nekomimi.nekogram.llm.utils.LlmUrlNormalizer
+import tw.nekomimi.nekogram.llm.utils.UrlNormalizer
 import java.io.ByteArrayInputStream
 import java.io.ObjectInputStream
 
@@ -154,13 +154,13 @@ object NaConfig {
         addConfig(
             "DoubleTapAction",
             ConfigItem.configTypeInt,
-            3
+            1
         )
     val doubleTapActionOut =
         addConfig(
             "DoubleTapActionOut",
             ConfigItem.configTypeInt,
-            8
+            1
         )
     val showCopyPhoto =
         addConfig(
@@ -783,6 +783,18 @@ object NaConfig {
             ConfigItem.configTypeString,
             ""
         )
+    val llmProviderVertexKey =
+        addConfig(
+            "LlmProviderVertexKey",
+            ConfigItem.configTypeString,
+            ""
+        )
+    val llmProviderVertexModel =
+        addConfig(
+            "LlmProviderVertexModel",
+            ConfigItem.configTypeString,
+            ""
+        )
     val llmTemperature =
         addConfig(
             "LlmTemperature",
@@ -1383,6 +1395,42 @@ object NaConfig {
             ConfigItem.configTypeBool,
             false
         )
+    val forwardProtectedAsCopy =
+        addConfig(
+            "ForwardProtectedAsCopy",
+            ConfigItem.configTypeBool,
+            false
+        )
+    val saveDeletedInPrivateChats =
+        addConfig(
+            "SaveDeletedInPrivateChats",
+            ConfigItem.configTypeBool,
+            true
+        )
+    val saveDeletedInGroups =
+        addConfig(
+            "SaveDeletedInGroups",
+            ConfigItem.configTypeBool,
+            true
+        )
+    val saveDeletedInChannels =
+        addConfig(
+            "SaveDeletedInChannels",
+            ConfigItem.configTypeBool,
+            true
+        )
+    val mainTabsHideCallsSettings =
+        addConfig(
+            "MainTabsHideCallsSettings",
+            ConfigItem.configTypeBool,
+            false
+        )
+    val mainTabsHideProfile =
+        addConfig(
+            "MainTabsHideProfile",
+            ConfigItem.configTypeBool,
+            false
+        )
     val mainTabsHideContacts =
         addConfig(
             "MainTabsHideContacts",
@@ -1435,6 +1483,13 @@ object NaConfig {
             0
         )
 
+    val replyToDeletedAsQuote =
+        addConfig(
+            "ReplyToDeletedAsQuote",
+            ConfigItem.configTypeBool,
+            true
+        )
+
     val preferredTranslateTargetLangList = ArrayList<String>()
     fun updatePreferredTranslateTargetLangList() {
         AndroidUtilities.runOnUIThread({
@@ -1485,6 +1540,9 @@ object NaConfig {
         if (translatorMode.Int() !in 0..2) {
             translatorMode.setConfigInt(0)
         }
+        if (notificationIcon.Int() !in 0..1) {
+            notificationIcon.setConfigInt(1)
+        }
         if (!getPreferences().contains(idDcType.key) && !getPreferences().getBoolean(
                 "ShowIdAndDc", true
             )
@@ -1518,7 +1576,7 @@ object NaConfig {
         }
 
         val currentLlmApiUrl = llmApiUrl.String()
-        val normalizedLlmApiUrl = LlmUrlNormalizer.normalizeBaseUrl(currentLlmApiUrl)
+        val normalizedLlmApiUrl = UrlNormalizer.normalizeBaseUrl(currentLlmApiUrl)
         if (normalizedLlmApiUrl != currentLlmApiUrl) {
             llmApiUrl.setConfigString(normalizedLlmApiUrl)
         }

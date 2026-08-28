@@ -18,13 +18,16 @@ import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
 
 import androidx.annotation.Keep;
+import androidx.annotation.NonNull;
+
+import com.google.android.material.loadingindicator.LoadingIndicator;
 
 import app.exteraless.appearance.M3CircularProgress;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.ui.ActionBar.Theme;
 
-public class RadialProgressView extends View {
+public class RadialProgressView extends View implements Drawable.Callback {
 
     private long lastUpdateTime;
     private float radOffset;
@@ -36,6 +39,8 @@ public class RadialProgressView extends View {
     private float drawingCircleLenght;
 
     private int progressColor;
+    private LoadingIndicator m3IndicatorView;
+    private Drawable m3Drawable;
 
     private DecelerateInterpolator decelerateInterpolator;
     private AccelerateInterpolator accelerateInterpolator;
@@ -54,9 +59,8 @@ public class RadialProgressView extends View {
     private boolean noProgress = true;
     private final Theme.ResourcesProvider resourcesProvider;
 
-    // M3-индикатор.
-    // (CircularProgressIndicator / LoadingIndicator из com.google.android.material).
-    // Зависимости у нас нет — дуга с дорожкой и зазором рисуется вручную.
+    // Стиль 1 рисует LoadingIndicator из com.google.android.material, как у exteraGram;
+    // дуга с дорожкой и зазором (стили 2 и 3) считается вручную в M3CircularProgress.
     private int currentStyle = M3CircularProgress.STYLE_LEGACY;
     private int trackColor;
     private M3CircularProgress m3;
@@ -213,6 +217,9 @@ public class RadialProgressView extends View {
 
     public void setSize(int value) {
         size = value;
+        if (m3IndicatorView != null) {
+            m3IndicatorView.setIndicatorSize(value);
+        }
         invalidate();
     }
 
@@ -223,19 +230,41 @@ public class RadialProgressView extends View {
     public void setProgressColor(int color) {
         progressColor = color;
         progressPaint.setColor(progressColor);
+        if (m3IndicatorView != null) {
+            m3IndicatorView.setIndicatorColor(color);
+        }
     }
 
     /**
-     * Стиль 0 — сток, 2 — CircularProgressIndicator,
-     * 3 — он же с волной. Стиль 1 (LoadingIndicator, M3 Expressive) не воспроизводим:
-     * ему нужны морф-фигуры из com.google.android.material, поэтому он остаётся стоковым.
+     * Стиль 0 — сток, 1 — LoadingIndicator из M3 Expressive,
+     * 2 — CircularProgressIndicator, 3 — он же с волной.
      */
     public void setStyle(int style) {
         style = M3CircularProgress.degradeStyle(style);
-        if (currentStyle == style) {
+        if (currentStyle == style
+                && (style != M3CircularProgress.STYLE_LOADING_INDICATOR || m3Drawable != null)) {
             return;
         }
         currentStyle = style;
+        final Drawable previous = m3Drawable;
+        if (style == M3CircularProgress.STYLE_LOADING_INDICATOR) {
+            if (m3IndicatorView == null) {
+                m3IndicatorView = new LoadingIndicator(getContext());
+            }
+            m3IndicatorView.setIndicatorSize(size);
+            m3IndicatorView.setIndicatorColor(progressColor);
+            m3Drawable = m3IndicatorView.getDrawable();
+        } else {
+            m3Drawable = null;
+        }
+        if (previous != null && previous != m3Drawable) {
+            previous.setVisible(false, false);
+            previous.setCallback(null);
+        }
+        if (m3Drawable != null) {
+            m3Drawable.setCallback(this);
+            m3Drawable.setVisible(isAttachedToWindow(), true);
+        }
         if (M3CircularProgress.isCircular(style)) {
             if (m3 == null) {
                 m3 = new M3CircularProgress();
@@ -304,6 +333,12 @@ public class RadialProgressView extends View {
 
     private void drawArc(Canvas canvas) {
         drawingCircleLenght = currentCircleLength;
+        if (currentStyle == M3CircularProgress.STYLE_LOADING_INDICATOR && m3Drawable != null) {
+            m3Drawable.setBounds((int) cicleRect.left, (int) cicleRect.top,
+                    (int) cicleRect.right, (int) cicleRect.bottom);
+            m3Drawable.draw(canvas);
+            return;
+        }
         if (m3 != null && M3CircularProgress.isCircular(currentStyle)) {
             m3.draw(canvas, cicleRect, radOffset, drawingCircleLenght, progressPaint);
             return;
@@ -313,6 +348,37 @@ public class RadialProgressView extends View {
 
     public boolean isCircle() {
         return Math.abs(drawingCircleLenght) >= 360;
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        if (m3Drawable != null) {
+            m3Drawable.setVisible(true, true);
+        }
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        if (m3Drawable != null) {
+            m3Drawable.setVisible(false, false);
+        }
+    }
+
+    @Override
+    public void invalidateDrawable(@NonNull Drawable who) {
+        invalidate();
+    }
+
+    @Override
+    public void scheduleDrawable(@NonNull Drawable who, @NonNull Runnable what, long when) {
+        postDelayed(what, when - android.os.SystemClock.uptimeMillis());
+    }
+
+    @Override
+    public void unscheduleDrawable(@NonNull Drawable who, @NonNull Runnable what) {
+        removeCallbacks(what);
     }
 
     private int getThemedColor(int key) {

@@ -2,6 +2,7 @@ package app.exteraless.appearance;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.ui.ActionBar.ActionBar;
+import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.ChatActivityTopPanelLayout;
 import org.telegram.ui.Components.ChatAvatarContainer;
 import org.telegram.ui.Components.chat.layouts.ChatActivityFadeView;
@@ -74,11 +75,19 @@ public final class ChatHeaderUiHelper {
         return zone + Math.round((height - zone) * 0.5f);
     }
 
-    /** setTopFadeColor у нашего ChatActivityFadeView нет, поэтому цвет не задаётся. */
-    public static void setupChatTopFade(ChatActivityFadeView fadeView, ActionBar actionBar, int actionBarHeight) {
+    public static int getChatFadeColorKey() {
+        return Theme.key_windowBackgroundGray;
+    }
+
+    public static void setupChatTopFade(ChatActivityFadeView fadeView, ActionBar actionBar, int fadeColor, int actionBarHeight) {
         fadeView.setFadeTopAlpha(actionBar.getVisibility() == ActionBar.VISIBLE ? 255 : 0);
         final int zone = getChatTopFadeZone(actionBarHeight);
-        fadeView.setFadeZoneTop(isMaterial3ChatHeaderStyle() ? getScaledChatTopFadeZone(actionBar, zone) : zone);
+        if (isMaterial3ChatHeaderStyle()) {
+            fadeView.setFadeZoneTop(getScaledChatTopFadeZone(actionBar, zone));
+            fadeView.setTopFadeColor(fadeColor);
+        } else {
+            fadeView.setFadeZoneTop(zone);
+        }
         fadeView.setFadeHeightTop(getChatTopFadeHeight());
     }
 

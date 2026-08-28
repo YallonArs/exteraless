@@ -140,7 +140,7 @@ public class PluginsActivity extends BaseFragment {
             controller.rescanPlugins();
         }
         plugins.clear();
-        plugins.addAll(controller.getPlugins());
+        plugins.addAll(controller.getPluginsSnapshot());
         plugins.sort((a, b) -> {
             // Закреплённые — наверх: список плагинов растёт, и нужные иначе
             // тонут среди остальных по алфавиту.

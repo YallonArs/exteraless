@@ -18,6 +18,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
+import android.content.res.Resources;
 import android.database.DataSetObserver;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -73,7 +74,6 @@ import org.telegram.tgnet.Vector;
 import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
-import org.telegram.ui.ActionBar.ThemeColors;
 import org.telegram.ui.ActionBar.ThemeDescription;
 import org.telegram.ui.Components.AlertsCreator;
 import org.telegram.ui.Components.BottomPagesView;
@@ -707,6 +707,36 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
         private float maxRefreshRate;
         private long lastDrawFrame;
 
+        private final GenericProvider<Void, Bitmap> blankProvider = v -> {
+            Bitmap bm = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888);
+            bm.eraseColor(Color.TRANSPARENT);
+            return bm;
+        };
+
+        private final GenericProvider<Void, Bitmap> appIconProvider = v -> {
+            int size = dp(ICON_HEIGHT_DP);
+            int bleed = size / 4;
+            Bitmap icon = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+            Canvas iconCanvas = new Canvas(icon);
+            Resources resources = getParentActivity().getResources();
+            for (int resId : new int[]{R.drawable.exteraless_icon_background, R.drawable.exteraless_icon_foreground}) {
+                Drawable layer = resources.getDrawable(resId);
+                if (layer == null) {
+                    continue;
+                }
+                layer.setBounds(-bleed, -bleed, size + bleed, size + bleed);
+                layer.draw(iconCanvas);
+            }
+            Bitmap bm = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+            Canvas c = new Canvas(bm);
+            Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            c.drawCircle(size / 2f, size / 2f, size / 2f, paint);
+            paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
+            c.drawBitmap(icon, 0, 0, paint);
+            icon.recycle();
+            return bm;
+        };
+
         private final GenericProvider<Void, Bitmap> telegramMaskProvider = v -> {
             int size = dp(ICON_HEIGHT_DP);
             Bitmap bm = Bitmap.createBitmap(dp(ICON_WIDTH_DP), size, Bitmap.Config.ARGB_8888);
@@ -840,16 +870,8 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
             loadTexture(R.drawable.intro_powerful_star, 18);
             loadTexture(R.drawable.intro_private_door, 19);
             loadTexture(R.drawable.intro_private_screw, 20);
-            loadTexture(R.drawable.intro_tg_plane, 21);
-            loadTexture(v -> {
-                Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-                paint.setColor(ThemeColors.TELEGRAM_COLOR); // It's logo color, it should not be colored by the theme
-                int size = dp(ICON_HEIGHT_DP);
-                Bitmap bm = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
-                Canvas c = new Canvas(bm);
-                c.drawCircle(size / 2f, size / 2f, size / 2f, paint);
-                return bm;
-            }, 22);
+            loadTexture(blankProvider, 21);
+            loadTexture(appIconProvider, 22);
             loadTexture(telegramMaskProvider, 23);
 
             updateTelegramTextures();

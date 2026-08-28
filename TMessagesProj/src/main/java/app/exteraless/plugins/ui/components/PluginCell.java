@@ -15,6 +15,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.BackupImageView;
@@ -44,7 +45,7 @@ import app.exteraless.plugins.ui.PluginIcons;
  * Компактный режим ({@link PluginsController#isCompactView()}) сжимает карточку
  * до строки с иконкой слева, как у exteraGram.
  */
-public class PluginCell extends FrameLayout {
+public class PluginCell extends FrameLayout implements NotificationCenter.NotificationCenterDelegate {
 
     private final View card;
     private final BackupImageView imageView;
@@ -65,6 +66,33 @@ public class PluginCell extends FrameLayout {
     private String pluginIcon;
     private PluginCellDelegate delegate;
     private boolean compact;
+    private boolean pluginEnabled;
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.pluginSettingsRegistered);
+        NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.pluginSettingsUnregistered);
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.pluginSettingsRegistered);
+        NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.pluginSettingsUnregistered);
+    }
+
+    @Override
+    public void didReceivedNotification(int id, int account, Object... args) {
+        if (id != NotificationCenter.pluginSettingsRegistered && id != NotificationCenter.pluginSettingsUnregistered) {
+            return;
+        }
+        if (args == null || args.length == 0 || !(args[0] instanceof String)
+                || pluginId == null || !pluginId.equals(args[0])) {
+            return;
+        }
+        settingsButton.setVisibility(id == NotificationCenter.pluginSettingsRegistered && pluginEnabled ? VISIBLE : GONE);
+    }
 
     public static final class Model {
         public final Plugin plugin;
@@ -87,7 +115,7 @@ public class PluginCell extends FrameLayout {
             description = plugin.description;
             loadError = plugin.loadError;
             icon = plugin.icon;
-            enabled = plugin.enabled;
+            enabled = plugin.enabled && plugin.loadError == null;
             hasSettings = plugin.hasSettings;
             this.pinned = pinned;
             this.compact = compact;
@@ -355,6 +383,7 @@ public class PluginCell extends FrameLayout {
         pluginId = model.id;
         pluginIcon = model.icon;
         compact = model.compact;
+        pluginEnabled = model.enabled;
 
         if (updateIcon) {
             imageView.setTag(null);
@@ -406,7 +435,6 @@ public class PluginCell extends FrameLayout {
         textParams.gravity = compact ? Gravity.CENTER_VERTICAL : Gravity.LEFT;
         nameView.setSingleLine(compact);
         subtitleView.setSingleLine(compact);
-        descriptionView.setVisibility(compact ? GONE : descriptionView.getVisibility());
         divider.setVisibility(compact ? GONE : VISIBLE);
         requestLayout();
     }

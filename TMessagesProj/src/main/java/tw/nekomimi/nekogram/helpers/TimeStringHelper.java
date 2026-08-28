@@ -28,15 +28,11 @@ import xyz.nextalone.nagram.NaConfig;
 public class TimeStringHelper {
     /**
      * openExtera: «изменено» иконкой вместо слова.
-     * Тумблер exteraGram (ChatsConfig.replaceEditedWithIcon) дублирует NagramX-овский
-     * NaConfig.useEditedIcon, поэтому читаем оба: включённый любой из них даёт иконку.
+     * Источник один — NaConfig.useEditedIcon: на него смотрят оба экрана,
+     * и NagramX-овский, и exteraGram-овский.
      */
     public static boolean useEditedIcon() {
-        if (NaConfig.INSTANCE.getUseEditedIcon().Bool()) {
-            return true;
-        }
-        app.exteraless.chats.ChatsConfig.ensureLoaded();
-        return app.exteraless.chats.ChatsConfig.replaceEditedWithIcon.Bool();
+        return NaConfig.INSTANCE.getUseEditedIcon().Bool();
     }
 
     public static SpannableStringBuilder deletedSpan;

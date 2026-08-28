@@ -16,6 +16,11 @@ import org.telegram.ui.Components.EditTextBoldCursor;
 import org.telegram.ui.Components.LayoutHelper;
 
 import app.exteraless.OpenExteraConfig;
+import app.exteraless.appearance.AppearanceConfig;
+import app.exteraless.chats.ChatsConfig;
+import app.exteraless.icons.IconPacksConfig;
+import app.exteraless.pillstack.PillStackConfig;
+import app.exteraless.utils.UtilsConfig;
 import tw.nekomimi.nekogram.NekoConfig;
 import tw.nekomimi.nekogram.config.ConfigItem;
 import xyz.nextalone.nagram.NaConfig;
@@ -98,12 +103,17 @@ public final class GeneralHelper {
     }
 
     /**
-     * Сброс настроек, которыми управляют экраны openExtera «General» и «Other»,
-     * к значениям по умолчанию. Остальные настройки NagramX не трогаются.
+     * Сброс всех настроек openExtera к значениям по умолчанию — так обещает диалог
+     * OEGeneralResetSettingsInfo. Настройки NagramX, кроме перечисленных ниже, не трогаются.
      */
     public static void resetSettings() {
         OpenExteraConfig.reset();
         GeneralConfig.reset();
+        AppearanceConfig.reset();
+        ChatsConfig.reset();
+        IconPacksConfig.reset();
+        PillStackConfig.reset();
+        UtilsConfig.reset();
         resetToDefault(NekoConfig.disableNumberRounding);
         resetToDefault(NekoConfig.showSeconds);
         resetToDefault(NekoConfig.disableVibration);

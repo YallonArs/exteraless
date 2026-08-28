@@ -21,10 +21,38 @@ ROOT = "com.exteragram.messenger"
 _EXACT = {
     "com.exteragram.messenger.utils.chats.ChatUtils":
         "com.exteragram.messenger.utils.chats.ChatUtils",
+    "com.exteragram.messenger.utils.ChatUtils":
+        "com.exteragram.messenger.utils.chats.ChatUtils",
     "com.exteragram.messenger.utils.text.LocaleUtils":
         "com.exteragram.messenger.utils.text.LocaleUtils",
+    "com.exteragram.messenger.utils.AppUtils":
+        "com.exteragram.messenger.utils.AppUtils",
+    "com.exteragram.messenger.R":
+        "org.telegram.messenger.R",
     "com.exteragram.messenger.utils.system.VibratorUtils":
         "com.exteragram.messenger.utils.system.VibratorUtils",
+    "com.exteragram.messenger.ai.AiConfig":
+        "app.exteraless.ai.AiConfig",
+    "com.exteragram.messenger.ai.AiController":
+        "com.exteragram.messenger.ai.AiController",
+    "com.exteragram.messenger.ai.ui.ResponseAlert":
+        "com.exteragram.messenger.ai.ui.ResponseAlert",
+    "com.exteragram.messenger.ai.ui.GenerateFromMessageBottomSheet":
+        "com.exteragram.messenger.ai.ui.GenerateFromMessageBottomSheet",
+    "com.exteragram.messenger.plugins.ui.components.InstallPluginBottomSheet":
+        "com.exteragram.messenger.plugins.ui.components.InstallPluginBottomSheet",
+    "com.exteragram.messenger.utils.system.SystemUtils":
+        "com.exteragram.messenger.utils.system.SystemUtils",
+    "com.exteragram.messenger.utils.SystemUtils":
+        "com.exteragram.messenger.utils.system.SystemUtils",
+    "com.exteragram.messenger.preferences.BasePreferencesActivity":
+        "com.exteragram.messenger.preferences.BasePreferencesActivity",
+    "com.exteragram.messenger.utils.chats.MainMenuHelper":
+        "app.exteraless.drawer.MainMenuHelper",
+    "com.exteragram.messenger.icons.ui.IconPacksActivity":
+        "app.exteraless.icons.IconPacksActivity",
+    "com.exteragram.messenger.pillstack.ui.pills.crypto.utils.ColoredBackground":
+        "app.exteraless.pillstack.pills.ColoredBackground",
     "com.exteragram.messenger.pillstack.ui.pills.weather.WeatherPill":
         "app.exteraless.pillstack.pills.WeatherPill",
     "com.exteragram.messenger.pillstack.ui.PillStackPreferencesActivity":
@@ -36,6 +64,8 @@ _EXACT = {
 }
 
 _PREFIXES = (
+    ("com.exteragram.messenger.ai.data.", "app.exteraless.ai.data."),
+    ("com.exteragram.messenger.ai.network.", "app.exteraless.ai.network."),
     ("com.exteragram.messenger.pillstack.core.", "app.exteraless.pillstack."),
     ("com.exteragram.messenger.pillstack.ui.pills.", "app.exteraless.pillstack.pills."),
     ("com.exteragram.messenger.pillstack.ui.", "app.exteraless.pillstack."),
@@ -69,7 +99,32 @@ def resolve(name):
 
 
 _FIELD_SHAPED = {
-    "com.exteragram.messenger.ExteraConfig": ("pluginsSafeMode", "iconPack", "inAppVibration"),
+    "com.exteragram.messenger.ExteraConfig": {
+        "pluginsSafeMode": "pluginsSafeMode",
+        "iconPack": "iconPack",
+        "inAppVibration": "inAppVibration",
+        "editor": "getEditor",
+        "pluginsEngine": "getPluginsEngine",
+        "centerTitle": "getCenterTitle",
+        "forceSnow": ("getForceSnow", "setForceSnow"),
+    },
+    "com.exteragram.messenger.plugins.PluginsController": {
+        "engines": "getEngines",
+    },
+    "com.exteragram.messenger.ai.AiConfig": {
+        "saveHistory": ("getSaveHistory", "setSaveHistory"),
+        "responseStreaming": ("getResponseStreaming", "setResponseStreaming"),
+        "temperature": ("getTemperature", "setTemperature"),
+        "showResponseOnly": ("getShowResponseOnly", "setShowResponseOnly"),
+        "insertAsQuote": ("getInsertAsQuote", "setInsertAsQuote"),
+        "selectedServiceId": ("getSelectedServiceId", "setSelectedServiceId"),
+        "selectedRole": ("getSelectedRole", "setSelectedRole"),
+        "preferences": "getPreferences",
+        "services": "getServices",
+        "roles": "getRoles",
+        "conversationHistory": "getConversationHistory",
+        "selectedService": "getSelectedService",
+    },
 }
 
 
@@ -84,15 +139,33 @@ class _FieldShapedClass:
     """
 
     def __init__(self, java_class, fields):
+        getters = {}
+        setters = {}
+        for field, target in fields.items():
+            if isinstance(target, (tuple, list)):
+                getters[field] = target[0]
+                if len(target) > 1 and target[1]:
+                    setters[field] = target[1]
+            else:
+                getters[field] = target
         object.__setattr__(self, "_exteraless_java", java_class)
-        object.__setattr__(self, "_exteraless_fields", frozenset(fields))
+        object.__setattr__(self, "_exteraless_fields", getters)
+        object.__setattr__(self, "_exteraless_setters", setters)
 
     def __getattr__(self, attr):
         target = object.__getattribute__(self, "_exteraless_java")
-        value = getattr(target, attr)
-        if attr in object.__getattribute__(self, "_exteraless_fields"):
-            return value()
-        return value
+        method = object.__getattribute__(self, "_exteraless_fields").get(attr)
+        if method is not None:
+            return getattr(target, method)()
+        return getattr(target, attr)
+
+    def __setattr__(self, attr, value):
+        target = object.__getattribute__(self, "_exteraless_java")
+        method = object.__getattribute__(self, "_exteraless_setters").get(attr)
+        if method is not None:
+            getattr(target, method)(value)
+            return
+        setattr(target, attr, value)
 
     def __repr__(self):
         return repr(object.__getattribute__(self, "_exteraless_java"))
@@ -105,17 +178,54 @@ def unwrap(obj):
     return obj
 
 
+def _field_shape(name):
+    fields = _FIELD_SHAPED.get(name)
+    if fields is not None:
+        return fields
+    for source, shaped in _FIELD_SHAPED.items():
+        if resolve(source) == name:
+            return shaped
+    return None
+
+
 def adapt(name, obj):
     """Обёртка над классом, форма которого у нас разошлась с эталоном."""
     if obj is None or isinstance(obj, _FieldShapedClass):
         return obj
-    fields = _FIELD_SHAPED.get(name)
+    replacement = substitute(name)
+    if replacement is not None:
+        return replacement
+    fields = _field_shape(name)
     if fields is None:
         return obj
     try:
         return _FieldShapedClass(obj, fields)
     except Exception:
         return obj
+
+
+_PYTHON_SUBSTITUTES = {
+    "com.exteragram.messenger.plugins.models.PluginItemFactory":
+        ("ui.settings", "SimpleSettingFactory"),
+}
+
+
+def substitute(name):
+    if not isinstance(name, str):
+        return None
+    target = _PYTHON_SUBSTITUTES.get(name)
+    if target is None:
+        for source, value in _PYTHON_SUBSTITUTES.items():
+            if resolve(source) == name:
+                target = value
+                break
+    if target is None:
+        return None
+    module, attr = target
+    try:
+        return getattr(_importlib.import_module(module), attr, None)
+    except Exception:
+        return None
 
 
 def is_alias(name):
@@ -138,6 +248,9 @@ class _AliasModule(_types.ModuleType):
         if attr.startswith("__"):
             raise AttributeError(attr)
         full = self.__name__ + "." + attr
+        replacement = substitute(full)
+        if replacement is not None:
+            return replacement
         found = _find_class(full)
         if found is not None:
             return found

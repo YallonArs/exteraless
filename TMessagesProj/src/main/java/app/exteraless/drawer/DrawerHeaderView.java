@@ -94,6 +94,7 @@ public class DrawerHeaderView extends FrameLayout {
         super(context);
 
         avatarView = new BackupImageView(context);
+        avatarView.getImageReceiver().setAvatarCornersApplied(true);
         avatarView.setRoundRadius(AppearanceConfig.getAvatarCorners(AndroidUtilities.dp(72)));
         addView(avatarView, LayoutHelper.createFrame(72, 72.0f, Gravity.LEFT | Gravity.TOP, 16.0f, 16.0f, 0.0f, 0.0f));
         avatarView.setOnClickListener(v -> {
@@ -284,6 +285,7 @@ public class DrawerHeaderView extends FrameLayout {
             return;
         }
         avatarDrawable.setInfo(account, user);
+        avatarView.getImageReceiver().setAvatarCornersApplied(true);
         avatarView.setRoundRadius(AppearanceConfig.getAvatarCorners(AndroidUtilities.dp(72)));
         avatarView.getImageReceiver().setCurrentAccount(account);
         avatarView.setForUserOrChat(user, avatarDrawable);

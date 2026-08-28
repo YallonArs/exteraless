@@ -1,5 +1,11 @@
 package com.exteragram.messenger;
 
+import android.content.SharedPreferences;
+
+import org.telegram.messenger.AndroidUtilities;
+
+import xyz.nextalone.nagram.NaConfig;
+
 import app.exteraless.appearance.AppearanceConfig;
 import app.exteraless.icons.BaseIconPacks;
 
@@ -35,18 +41,130 @@ public final class ExteraConfig {
     }
 
     /**
-     * Радиус скругления аватарки для стороны {@code size} в пикселях.
-     * Внимание: именно в пикселях, не в dp — как и у exteraGram.
+     * Радиус скругления аватарки для стороны {@code size} в dp — как у exteraGram,
+     * где эта перегрузка сама переводит результат в пиксели. Наш AppearanceConfig
+     * считает от пикселей, поэтому перевод делается здесь.
      */
     public static int getAvatarCorners(float size) {
-        return AppearanceConfig.INSTANCE.getAvatarCorners(size);
+        return getAvatarCorners(size, false, false);
     }
 
-    /**
-     * Вибро-отклик внутри приложения. В этом форке отдельного тумблера нет,
-     * поэтому отклик считается разрешённым — плагин сам решает, вибрировать ли.
-     */
+    public static float getAvatarCorners() {
+        return AppearanceConfig.INSTANCE.avatarCorners();
+    }
+
+    public static int getAvatarCorners(float size, boolean inPixels) {
+        return getAvatarCorners(size, inPixels, false);
+    }
+
+    public static int getAvatarCorners(float size, boolean inPixels, boolean forum) {
+        float value = inPixels ? size : AndroidUtilities.dp(size);
+        return AppearanceConfig.INSTANCE.getAvatarCorners(value,
+                forum ? AppearanceConfig.CORNER_TYPE_FORUM : AppearanceConfig.CORNER_TYPE_DEFAULT,
+                false);
+    }
+
+    public static boolean getCenterTitle() {
+        return AppearanceConfig.INSTANCE.centerTitle();
+    }
+
+    public static boolean getGroupMessageMenu() {
+        return NaConfig.INSTANCE.getGroupedMessageMenu().Bool();
+    }
+
+    public static boolean getPluginsEngine() {
+        return app.exteraless.plugins.PluginsController.getInstance().isEngineEnabled();
+    }
+
+    public static boolean getPluginsSafeMode() {
+        return pluginsSafeMode();
+    }
+
+    public static SharedPreferences.Editor getEditor() {
+        return new SafeModeEditor();
+    }
+
+    /** Вибро-отклик внутри приложения; в этом форке за него отвечает NekoConfig.disableVibration. */
     public static boolean inAppVibration() {
-        return true;
+        return !tw.nekomimi.nekogram.NekoConfig.disableVibration.Bool();
+    }
+
+    public static boolean getInAppVibration() {
+        return inAppVibration();
+    }
+
+    public static boolean forceSnow() {
+        return tw.nekomimi.nekogram.NekoConfig.actionBarDecoration.Int() == 1;
+    }
+
+    public static boolean getForceSnow() {
+        return forceSnow();
+    }
+
+    public static void setForceSnow(boolean enabled) {
+        tw.nekomimi.nekogram.NekoConfig.actionBarDecoration.setConfigInt(enabled ? 1 : 0);
+        NaConfig.INSTANCE.getChatDecoration().setConfigInt(enabled ? 1 : 0);
+    }
+
+    private static final class SafeModeEditor implements SharedPreferences.Editor {
+
+        private Boolean safeMode;
+
+        @Override
+        public SharedPreferences.Editor putBoolean(String key, boolean value) {
+            if (app.exteraless.plugins.PluginsConstants.KEY_SAFE_MODE.equals(key)) {
+                safeMode = value;
+            }
+            return this;
+        }
+
+        @Override
+        public SharedPreferences.Editor putString(String key, String value) {
+            return this;
+        }
+
+        @Override
+        public SharedPreferences.Editor putStringSet(String key, java.util.Set<String> values) {
+            return this;
+        }
+
+        @Override
+        public SharedPreferences.Editor putInt(String key, int value) {
+            return this;
+        }
+
+        @Override
+        public SharedPreferences.Editor putLong(String key, long value) {
+            return this;
+        }
+
+        @Override
+        public SharedPreferences.Editor putFloat(String key, float value) {
+            return this;
+        }
+
+        @Override
+        public SharedPreferences.Editor remove(String key) {
+            return this;
+        }
+
+        @Override
+        public SharedPreferences.Editor clear() {
+            return this;
+        }
+
+        @Override
+        public boolean commit() {
+            apply();
+            return true;
+        }
+
+        @Override
+        public void apply() {
+            if (safeMode != null) {
+                app.exteraless.plugins.PluginsController.getInstance().setSafeMode(safeMode);
+                safeMode = null;
+            }
+        }
     }
 }

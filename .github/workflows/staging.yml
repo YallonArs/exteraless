@@ -96,7 +96,7 @@ jobs:
           export BUILD_TIMESTAMP=$(date +%s)
           echo "build_timestamp=$BUILD_TIMESTAMP" >> "$GITHUB_OUTPUT"
           ./gradlew TMessagesProj:assembleStaging
-      - name: Upload Artifacts
+      - name: Upload arm64-v8a Artifact
         uses: actions/upload-artifact@v7
         with:
           name: Staging

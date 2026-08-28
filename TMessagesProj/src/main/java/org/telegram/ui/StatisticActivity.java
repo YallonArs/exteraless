@@ -626,7 +626,7 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
 
         tabs = tabViews.toArray(new GlassTabView[0]);
         tabsView = new MainTabsLayout(context, resourceProvider);
-        tabsView.setPadding(dp(DialogsActivity.MAIN_TABS_MARGIN + 4), dp(DialogsActivity.MAIN_TABS_MARGIN + 4), dp(DialogsActivity.MAIN_TABS_MARGIN + 4), dp(DialogsActivity.MAIN_TABS_MARGIN + 4));
+        app.exteraless.appearance.MainTabsUiHelper.applyTabsLayoutStyle(tabsView, dp(328 + DialogsActivity.MAIN_TABS_MARGIN * 2));
 
         for (int index = 0; index < tabs.length; index++) {
             final GlassTabView view = tabs[index];
@@ -781,7 +781,7 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
         contentLayout.addView(viewPagerFixed, LayoutHelper.createFrameMatchParent());
         contentLayout.addView(actionBar);
         if (showTabs) {
-            contentLayout.addView(tabsView, LayoutHelper.createFrame(328 + DialogsActivity.MAIN_TABS_MARGIN * 2, DialogsActivity.MAIN_TABS_HEIGHT_WITH_MARGINS, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL));
+            contentLayout.addView(tabsView, LayoutHelper.createFrame(app.exteraless.appearance.MainTabsUiHelper.getTabsViewWidth(), app.exteraless.appearance.MainTabsUiHelper.getTabsViewHeightDp(), Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL));
             Bulletin.addDelegate(this, new Bulletin.Delegate() {
                 @Override
                 public int getBottomOffset(int tag) {
@@ -1047,8 +1047,8 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
 
         if (tabViews != null) {
             BlurredBackgroundDrawable tabsViewBackground = iBlur3FactoryLiquidGlass.create(tabsView, BlurredBackgroundProviderImpl.mainTabs(resourceProvider));
-            tabsViewBackground.setRadius(dp(DialogsActivity.MAIN_TABS_HEIGHT / 2f));
-            tabsViewBackground.setPadding(dp(DialogsActivity.MAIN_TABS_MARGIN - 0.334f));
+            tabsViewBackground.setRadius(app.exteraless.appearance.MainTabsUiHelper.getBackgroundRadius());
+            tabsViewBackground.setPadding(app.exteraless.appearance.MainTabsUiHelper.getBackgroundInset());
             tabsView.setBackground(tabsViewBackground);
         }
 
@@ -3572,11 +3572,12 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
         final int statusbar = AndroidUtilities.statusBarHeight;
 
         if (tabsView != null) {
-            tabsView.setTranslationY(-navbar);
+            app.exteraless.appearance.MainTabsUiHelper.applyTabsBottomInset(tabsView, navbar);
+            tabsView.setTranslationY(app.exteraless.appearance.MainTabsUiHelper.isMaterial3NavigationBar() ? 0 : -navbar);
         }
 
         final int pt = ActionBar.getCurrentActionBarHeight() + statusbar;
-        final int pb = (showTabs ? dp(DialogsActivity.MAIN_TABS_HEIGHT_WITH_MARGINS) : 0) + navbar;
+        final int pb = (showTabs ? dp(app.exteraless.appearance.MainTabsUiHelper.getTabsViewHeightDp()) : 0) + navbar;
 
         if (recyclerListView != null) {
             recyclerListView.setPadding(0, pt, 0, pb);
@@ -3641,11 +3642,8 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
         }
 
         final int additionalList = dp(48);
-        final int mainTabBottom = fragmentView.getMeasuredHeight() - AndroidUtilities.navigationBarHeight - dp(DialogsActivity.MAIN_TABS_MARGIN);
-        final int mainTabTop = mainTabBottom - dp(DialogsActivity.MAIN_TABS_HEIGHT);
-
         iBlur3PositionActionBar.set(0, -additionalList, fragmentView.getMeasuredWidth(), actionBar.getMeasuredHeight() + additionalList);
-        iBlur3PositionMainTabs.set(0, mainTabTop, fragmentView.getMeasuredWidth(), mainTabBottom);
+        app.exteraless.appearance.MainTabsUiHelper.setBlurBounds(iBlur3PositionMainTabs, fragmentView, AndroidUtilities.navigationBarHeight);
         iBlur3PositionMainTabs.inset(0, LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS) ? 0 : -dp(48));
 
         scrollableViewNoiseSuppressor.setupRenderNodes(iBlur3Positions, 2);

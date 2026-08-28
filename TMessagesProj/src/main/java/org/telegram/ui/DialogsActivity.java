@@ -101,7 +101,7 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.LinearSmoothScrollerCustom;
+import org.telegram.ui.recyclerview.LinearSmoothScrollerCustom;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager.widget.ViewPager;
 
@@ -3991,9 +3991,16 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 public void onTabSelected(FilterTabsView.Tab tab, boolean forward, boolean animated) {
                     if (actionBar == null) return;
                     if (NaConfig.INSTANCE.getFolderNameAsTitle().Bool()) {
-                        actionBar.setTitleAnimatedX(tab.isDefault ? actionBarTitleNax : EmojiHelper.removeEmojiSpans(tab.realTitle), tab.isDefault ? statusDrawable : null, forward, 250);
+                        CharSequence title = tab.isDefault ? actionBarTitleNax : EmojiHelper.removeEmojiSpans(tab.realTitle);
+                        actionBar.setTitleAnimatedX(title, tab.isDefault ? statusDrawable : null, forward, 250);
+                        if (dialogStoriesCell != null) {
+                            dialogStoriesCell.setLogoTitle(title, tab.isDefault, animated, forward);
+                        }
                     } else {
                         actionBar.setTitle(actionBarTitleNax, statusDrawable);
+                        if (dialogStoriesCell != null) {
+                            dialogStoriesCell.setLogoTitle(actionBarTitleNax, true, animated, forward);
+                        }
                     }
                 }
             });
@@ -4026,7 +4033,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 }
                 if (id == -1) {
                     // Левая кнопка переключает свою шторку.
-                    if (AppearanceConfig.navigationDrawer() && drawerContainer() != null && canOpenDrawer()) {
+                    if (!actionBar.isActionModeShowed() && AppearanceConfig.navigationDrawer() && drawerContainer() != null && canOpenDrawer()) {
                         drawerContainer().toggleDrawer();
                         return;
                     }
@@ -5501,6 +5508,16 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             }
         };
         dialogStoriesCell.setActionBar(actionBar);
+        if (NaConfig.INSTANCE.getFolderNameAsTitle().Bool() && filterTabsView != null) {
+            for (int i = 0; i < filterTabsView.getTabsCount(); i++) {
+                FilterTabsView.Tab tab = filterTabsView.getTab(i);
+                if (tab != null && tab.id == filterTabsView.getCurrentTabId() && !tab.isDefault) {
+                    dialogStoriesCell.setLogoTitle(EmojiHelper.removeEmojiSpans(tab.realTitle), false, false, false);
+                    break;
+                }
+            }
+        }
+        dialogStoriesCell.updateStatus(UserConfig.getInstance(currentAccount).getCurrentUser(), false);
         // Бургер занимает место архива.
         dialogStoriesCell.setMenuItemsOffset(getDialogStoriesMenuItemsOffset());
         dialogStoriesCell.allowGlobalUpdates = false;
@@ -5531,7 +5548,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         undoView[1] = null;
 
         if (hasMainTabs) {
-            actionBar.getTitlesContainer().setTranslationX(dp(4));
+            actionBar.getTitlesContainer().setTranslationX(NaConfig.INSTANCE.getCenterActionBarTitle().Bool() && NaConfig.INSTANCE.getCenterActionBarTitleType().Int() != 3 ? 0 : dp(4));
             actionBar.setTitleColor(getThemedColor(Theme.key_telegram_color_dialogsLogo));
         }
 
@@ -6910,6 +6927,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         // actionMode.drawBlur = false;
 
         // При своей шторке слева уже есть бургер/стрелка.
+        actionModeCloseView = null;
         if (hasMainTabs && !AppearanceConfig.navigationDrawer()) {
             actionModeCloseView = new ImageView(getContext());
             actionModeCloseView.setScaleType(ImageView.ScaleType.CENTER);
@@ -6925,7 +6943,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         selectedDialogsCountTextView.setTextSize(18);
         selectedDialogsCountTextView.setTypeface(AndroidUtilities.bold());
         selectedDialogsCountTextView.setTextColor(getThemedColor(Theme.key_actionBarActionModeDefaultIcon));
-        actionMode.addView(selectedDialogsCountTextView, LayoutHelper.createLinear(0, LayoutHelper.MATCH_PARENT, 1.0f, hasMainTabs ? 18 : 72, 0, 0, 0));
+        actionMode.addView(selectedDialogsCountTextView, LayoutHelper.createLinear(0, LayoutHelper.MATCH_PARENT, 1.0f, actionModeCloseView != null ? 18 : 72, 0, 0, 0));
         selectedDialogsCountTextView.setOnTouchListener((v, event) -> true);
 
         pinItem = actionMode.addItemWithWidth(pin, R.drawable.msg_pin, dp(48));
@@ -7150,6 +7168,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 filterTabsView.resetTabId();
 
                 // NagramX: use folder name as title
+                if (dialogStoriesCell != null) {
+                    dialogStoriesCell.setLogoTitle(actionBarTitleNax, true, animated && NaConfig.INSTANCE.getFolderNameAsTitle().Bool(), false);
+                }
                 if (!actionBarTitleNax.equals(actionBar.getTitle())) {
                     if (NaConfig.INSTANCE.getFolderNameAsTitle().Bool()) {
                         actionBar.setTitleAnimatedX(actionBarTitleNax, statusDrawable, false, 250);
@@ -14744,6 +14765,17 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
     @Override
     public void onParentScrollToTop() {
+        // Как в Telegram для iOS: тап по вкладке «Чаты» сначала возвращает в первую папку,
+        // и только потом крутит список наверх. switchToCurrentSelectedMode уже ставит
+        // список нужной папки в начало, поэтому отдельный scrollToTop тут не нужен.
+        if (AppearanceConfig.iosFirstFolderOnTabTap()
+                && filterTabsView != null && filterTabsView.getVisibility() == View.VISIBLE
+                && !tabsAnimationInProgress && !filterTabsView.isAnimatingIndicator() && !startedTracking
+                && !filterTabsView.isFirstTabSelected()
+                && (rightSlidingDialogContainer == null || !rightSlidingDialogContainer.hasFragment())) {
+            filterTabsView.selectFirstTab();
+            return;
+        }
         scrollToTop(true, true);
     }
 

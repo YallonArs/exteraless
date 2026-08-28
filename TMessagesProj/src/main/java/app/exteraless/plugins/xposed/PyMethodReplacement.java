@@ -5,6 +5,7 @@ import com.chaquo.python.PyObject;
 import org.telegram.messenger.FileLog;
 
 import java.lang.reflect.Method;
+import java.util.Collections;
 import java.util.List;
 
 import de.robv.android.xposed.XC_MethodHook;
@@ -24,6 +25,14 @@ public class PyMethodReplacement extends XC_MethodHook {
     private final String pluginId;
     private final PyObject handler;
     private final List<HookFilter> beforeFilters;
+
+    public PyMethodReplacement(String pluginId, PyObject handler) {
+        this(pluginId, handler, PRIORITY_DEFAULT);
+    }
+
+    public PyMethodReplacement(String pluginId, PyObject handler, int priority) {
+        this(pluginId, handler, priority, Collections.emptyList());
+    }
 
     public PyMethodReplacement(String pluginId, PyObject handler, int priority,
                         List<HookFilter> beforeFilters) {

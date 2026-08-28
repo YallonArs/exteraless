@@ -119,6 +119,10 @@ def _plugin_id_of(record) -> Optional[str]:
 
 # Entry module / plugin class
 
+def _strings_declared(refmap: Dict[str, str]) -> Optional[str]:
+    return refmap.get("strings") or refmap.get("locales")
+
+
 def _entry_dirs(refmap: Dict[str, str], extract_dir: str) -> List[str]:
     """Каталог entry-модуля, если он лежит не в корне архива.
 
@@ -233,7 +237,7 @@ def _build_environment(plugin_id: str, refmap: Dict[str, str],
     if assets_dir is not None:
         environment["assets"] = Assets(assets_dir)
 
-    strings_declared = refmap.get("strings")
+    strings_declared = _strings_declared(refmap)
     if strings_declared:
         strings_path = os.path.join(extract_dir, strings_declared.strip("/"))
         if os.path.exists(strings_path):
@@ -265,7 +269,7 @@ def load_plugin_record(record, path: str) -> None:
         raw_meta = metadata.parse_mapping_file(
             metainfo_member, archive.read_member(zf, metainfo_member))
         catalog = None
-        strings_declared = refmap.get("strings")
+        strings_declared = _strings_declared(refmap)
         if strings_declared:
             from .localization import load_strings_from_zip
 

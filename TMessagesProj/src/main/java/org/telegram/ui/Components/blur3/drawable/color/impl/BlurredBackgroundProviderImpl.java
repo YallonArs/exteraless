@@ -9,8 +9,10 @@ import androidx.core.math.MathUtils;
 
 import org.telegram.messenger.LiteMode;
 import org.telegram.messenger.MessagesController;
+import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.UserConfig;
+import org.telegram.messenger.Utilities;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.blur3.drawable.color.BlurredBackgroundProvider;
 import org.telegram.ui.Components.blur3.drawable.color.BlurredBackgroundProviderBuilder;
@@ -76,12 +78,32 @@ public class BlurredBackgroundProviderImpl {
                 .build();
     }
 
+    public static BlurredBackgroundProvider messageMenuReactionsBackground(Theme.ResourcesProvider resourcesProvider) {
+        return messageMenuBackground(resourcesProvider);
+    }
+
+    public static BlurredBackgroundProvider messageMenuBackground(Theme.ResourcesProvider resourcesProvider) {
+        return new BlurredBackgroundProviderBuilder(resourcesProvider)
+                .setBackgroundColor((r, isDark) -> {
+                    if (!LiteMode.isEnabled(LiteMode.FLAG_CHAT_BLUR)) {
+                        return Theme.getColor(Theme.key_actionBarDefaultSubmenuBackground);
+                    }
+                    return Theme.multAlpha(Theme.getColor(Theme.key_actionBarDefaultSubmenuBackground), isDark ? 0.85f : 0.825f);
+                })
+                .setStrokeColorTop(0x44FFFFFF, 0)
+                .setStrokeColorBottom(0x22FFFFFF, 0)
+                .setShadowColor(0x38000000, 0)
+                .setShadowLayer(dpf2(3.5f), 0, 0)
+                .setStrokeWidth(dpf2(2 / 3f), dpf2(2 / 3f))
+                .build();
+    }
+
     public static BlurredBackgroundProvider scrimMenuBackground(Theme.ResourcesProvider resourcesProvider) {
         return new BlurredBackgroundProviderBuilder(resourcesProvider)
             .setBackgroundColor((r, isDark) ->
-                Theme.multAlpha(Theme.getColor(Theme.key_actionBarDefaultSubmenuBackground), isDark ? 0.85f : 0.76f))
-            .setStrokeColorTop(0xFFFFFFFF, 0)
-            .setStrokeColorBottom(0xFFFFFFFF, 0)
+                Theme.multAlpha(Theme.getColor(Theme.key_actionBarDefaultSubmenuBackground), isDark ? 0.85f : 0.825f))
+            .setStrokeColorTop(0x44FFFFFF, 0)
+            .setStrokeColorBottom(0x22FFFFFF, 0)
             .setShadowColor(0x26000000, 0)
             .setShadowLayer(dpf2(4f), 0, 0)
             .setStrokeWidth(dpf2(2 / 3f), dpf2(2 / 3f))
@@ -153,22 +175,6 @@ public class BlurredBackgroundProviderImpl {
                 .build();
     }
 
-    public static BlurredBackgroundProvider attachMenuActionBar(Theme.ResourcesProvider resourcesProvider) {
-        return new BlurredBackgroundProviderBuilder(resourcesProvider)
-                .setBackgroundColor((r, isDark) -> {
-                    final float alpha = LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS) ? 0.85f : 0.76f;
-                    final int colorBg = Theme.getColor(isDark ? Theme.key_windowBackgroundGray : Theme.key_dialogBackgroundGray, r);
-                    final int colorTarget = Theme.getColor(Theme.key_windowBackgroundWhite, r);
-                    return solveSrcColor(colorBg, colorTarget, alpha);
-                })
-                .setStrokeColorTop(0xFFFFFFFF, 0x28FFFFFF)
-                .setStrokeColorBottom(0xFFFFFFFF, 0x14FFFFFF)
-                .setShadowColor(0x20000000, 0)
-                //.setShadowLayer(dpf2(10 / 3f), 0, dpf2(2 / 3f))
-                .setStrokeWidth(dpf2(1), dpf2(2 / 3f))
-                .build();
-    }
-
     public static BlurredBackgroundProvider topPanelChatActivityTags(Theme.ResourcesProvider resourcesProvider) {
         return new BlurredBackgroundProviderBuilder(resourcesProvider)
             .setBackgroundColor((r, isDark) -> {
@@ -193,6 +199,10 @@ public class BlurredBackgroundProviderImpl {
     public static BlurredBackgroundProvider topPanelChatActivitySearchListBg(Theme.ResourcesProvider resourcesProvider) {
         return new BlurredBackgroundProviderBuilder(resourcesProvider)
                 .setBackgroundColor((r, isDark) -> {
+                    if (!checkBlurEnabled(resourcesProvider)) {
+                        return ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhite, r), 255);
+                    }
+
                     final float alpha = 0.7f;
                     final int colorBg = Theme.getColor(Theme.key_windowBackgroundWhite, r);
                     return Theme.multAlpha(colorBg, alpha);

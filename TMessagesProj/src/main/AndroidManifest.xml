@@ -67,6 +67,7 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.READ_PHONE_NUMBERS" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
 
     <uses-permission android:name="com.sec.android.provider.badge.permission.READ"/>
     <uses-permission android:name="com.sec.android.provider.badge.permission.WRITE"/>
@@ -625,6 +626,7 @@
             android:name=".NotificationsService"
             android:enabled="true"
             android:exported="true"
+            android:stopWithTask="false"
             android:foregroundServiceType="remoteMessaging"
         />
         <service
@@ -839,7 +841,7 @@
             android:exported="false"
             android:grantUriPermissions="true"/>
 
-        <meta-data android:name="com.google.android.maps.v2.API_KEY" android:value="AIzaSyDE_x6GRKJCSfCY33soBYUQ2piYsgjVpVE" />
+        <meta-data android:name="com.google.android.geo.API_KEY" android:value="${MAPS_API_KEY}" />
         <uses-library android:name="com.google.android.maps" android:required="false"/>
         <uses-library android:name="org.apache.http.legacy" android:required="false" />
 
@@ -865,7 +867,6 @@
 
         <!--<meta-data android:name="com.google.android.gms.wallet.api.enabled" android:value="true" />-->
 
-        <!--
         <meta-data android:name="com.google.android.gms.car.notification.SmallIcon" android:resource="@drawable/ic_player" />
         <meta-data android:name="com.google.android.gms.car.application" android:resource="@xml/automotive_app_desc" />
 
@@ -881,8 +882,7 @@
 
         <meta-data
             android:name="androidx.car.app.minCarApiLevel"
-            android:value="5" />
-        -->
+            android:value="7" />
 
         <!--<meta-data android:name="com.google.android.gms.vision.DEPENDENCIES" android:value="face,barcode" />-->
 

@@ -53,10 +53,15 @@ public class PluginPermissionsActivity extends BaseFragment {
     private static final int ID_PERM_BASE = 100;
     /** Ниже базы переключателей: id строк-переключателей начинаются со 100. */
     private static final int ID_ACTIVITY_LOG = 1;
+    private static final int ID_OBFUSCATION = 2;
+    private static final int ID_UNSAFE = 3;
 
     private final String pluginId;
 
     private UniversalRecyclerView listView;
+    /** Блок «код обфусцирован»: держим один, чтобы список не переанимировал строку. */
+    private android.view.View obfuscationView;
+    private android.view.View unsafeView;
     /** Какие строки раскрыты — переживает пересборку списка. */
     private final java.util.Set<String> expanded = new java.util.HashSet<>();
     /** Вьюхи строк по разрешению: новая вьюха на каждую пересборку = анимация строки. */
@@ -165,13 +170,17 @@ public class PluginPermissionsActivity extends BaseFragment {
         if (plugin == null) {
             return new ArrayList<>();
         }
-        List<String> requested = plugin.permissionsDeclared
+        final Map<String, List<String>> scan = PluginCapabilityScan.load(plugin.id);
+        // Обфусцированному плагину диалог установки предлагает весь список:
+        // объявленному в таком коде верить не на чем, и отзывать выданное надо
+        // там же, где выдавали.
+        List<String> requested = plugin.permissionsDeclared && !PluginCapabilityScan.isObfuscated(scan)
                 ? PluginPermissions.getRequested(plugin)
                 : new ArrayList<>(PluginPermissions.REQUESTABLE);
         // Объявленному верить целиком нельзя: диалог установки спрашивает по
         // уликам разбора, и без этого объединения выданное там разрешение
         // потом негде было бы увидеть и отозвать.
-        for (String perm : PluginCapabilityScan.ordered(PluginCapabilityScan.load(plugin.id))) {
+        for (String perm : PluginCapabilityScan.ordered(scan)) {
             if (!requested.contains(perm)) {
                 requested.add(perm);
             }
@@ -249,6 +258,33 @@ public class PluginPermissionsActivity extends BaseFragment {
         // Улики разбора: по ним видно, откуда разрешение вообще взялось.
         // Читаются из записанного при установке, файл заново не разбирается.
         final Map<String, List<String>> capabilities = PluginCapabilityScan.load(pluginId);
+        if (PluginCapabilityScan.isObfuscated(capabilities)) {
+            if (obfuscationView == null) {
+                android.widget.FrameLayout frame = new android.widget.FrameLayout(getContext());
+                frame.addView(PluginInstallSheet.createObfuscationWarning(getContext(),
+                                PluginCapabilityScan.obfuscationEvidence(capabilities)),
+                        org.telegram.ui.Components.LayoutHelper.createFrame(
+                                org.telegram.ui.Components.LayoutHelper.MATCH_PARENT,
+                                org.telegram.ui.Components.LayoutHelper.WRAP_CONTENT,
+                                android.view.Gravity.TOP, 16, 4, 16, 12));
+                obfuscationView = frame;
+            }
+            items.add(UItem.asCustom(ID_OBFUSCATION, obfuscationView));
+        }
+        if (PluginPermissions.isUnsafeMode()) {
+            if (unsafeView == null) {
+                android.widget.FrameLayout frame = new android.widget.FrameLayout(getContext());
+                frame.addView(PluginInstallSheet.createWarningBox(getContext(),
+                                getString(R.string.PluginsUnsafeMode),
+                                getString(R.string.PluginsUnsafeModeActive), null),
+                        org.telegram.ui.Components.LayoutHelper.createFrame(
+                                org.telegram.ui.Components.LayoutHelper.MATCH_PARENT,
+                                org.telegram.ui.Components.LayoutHelper.WRAP_CONTENT,
+                                android.view.Gravity.TOP, 16, 4, 16, 12));
+                unsafeView = frame;
+            }
+            items.add(UItem.asCustom(ID_UNSAFE, unsafeView));
+        }
         List<String> enforced = new ArrayList<>();
         for (String perm : requested) {
             if (!isEnforced(perm)) {
@@ -489,7 +525,16 @@ public class PluginPermissionsActivity extends BaseFragment {
         // происходило, приходилось жать «Перезагрузить» вручную.
         // reloadPlugin умеет и то и другое: снимет хуки, если загружен, и
         // загрузит заново в любом случае.
-        if (plugin == null || !plugin.enabled) {
+        if (plugin == null) {
+            return;
+        }
+        if (!plugin.enabled) {
+            if (getContext() != null) {
+                BulletinFactory.of(this)
+                        .createSimpleBulletin(R.raw.info,
+                                getString(R.string.PluginPermissionsEnableFirst))
+                        .show();
+            }
             return;
         }
         controller.reloadPlugin(pluginId);

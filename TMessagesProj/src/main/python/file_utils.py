@@ -110,6 +110,11 @@ def _own_roots(plugin_id: str):
     cache = get_cache_dir()
     if cache:
         roots.append(_real(os.path.join(cache, "plugins", plugin_id)))
+    tmpdir = os.environ.get("TMPDIR")
+    if not tmpdir and cache:
+        tmpdir = os.path.join(cache, "chaquopy", "tmp")
+    if tmpdir:
+        roots.append(_real(tmpdir))
     _own_roots_cache[plugin_id] = roots
     return roots
 

@@ -586,6 +586,7 @@ public class DrawerAccountPickerView extends FrameLayout {
         }
 
         private void updateAvatarRadius() {
+            avatarView.getImageReceiver().setAvatarCornersApplied(true);
             avatarView.setRoundRadius(AppearanceConfig.getAvatarCorners(AndroidUtilities.dp(34)));
         }
 

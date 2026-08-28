@@ -5,9 +5,13 @@ import android.text.TextUtils;
 import androidx.annotation.NonNull;
 
 import org.json.JSONObject;
+import org.telegram.PhoneFormat.CallingCodeInfo;
+import org.telegram.PhoneFormat.PhoneFormat;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.FileLog;
+import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.Utilities;
+import org.telegram.tgnet.TLRPC;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -265,22 +269,49 @@ public class ExchangeRates {
         return false;
     }
 
-    /** AUTO → валюта системной локали, если она нам известна, иначе USD. */
+    /** AUTO → валюта страны номера телефона аккаунта, если она нам известна, иначе USD. */
     public static String resolveTargetCurrency(String selection) {
         String normalized = PillCurrencies.normalize(selection);
         if (!PillCurrencies.AUTO.equals(normalized)) {
             return TextUtils.isEmpty(normalized) || !isSupportedCurrency(normalized) ? "USD" : normalized;
         }
+        String code = currencyOfCountry(phoneCountry());
+        return code == null ? "USD" : code;
+    }
+
+    private static String phoneCountry() {
         try {
-            Currency currency = Currency.getInstance(Locale.getDefault());
-            if (currency != null) {
-                String code = PillCurrencies.normalize(currency.getCurrencyCode());
-                if (isSupportedCurrency(code)) {
-                    return code;
-                }
+            TLRPC.User user = UserConfig.getInstance(UserConfig.selectedAccount).getCurrentUser();
+            if (user == null || TextUtils.isEmpty(user.phone)) {
+                return null;
             }
+            String phone = PhoneFormat.stripExceptNumbers(user.phone);
+            CallingCodeInfo info = PhoneFormat.getInstance().findCallingCodeInfo(phone);
+            if (info == null) {
+                return null;
+            }
+            if ("7".equals(info.callingCode)) {
+                return phone.startsWith("76") || phone.startsWith("77") ? "KZ" : "RU";
+            }
+            return info.countries.isEmpty() ? null : info.countries.get(0).toUpperCase(Locale.US);
         } catch (Exception ignore) {
+            return null;
         }
-        return "USD";
+    }
+
+    private static String currencyOfCountry(String country) {
+        if (TextUtils.isEmpty(country) || country.length() != 2) {
+            return null;
+        }
+        try {
+            Currency currency = Currency.getInstance(new Locale("", country.toUpperCase(Locale.US)));
+            if (currency == null) {
+                return null;
+            }
+            String code = PillCurrencies.normalize(currency.getCurrencyCode());
+            return isSupportedCurrency(code) ? code : null;
+        } catch (Exception ignore) {
+            return null;
+        }
     }
 }

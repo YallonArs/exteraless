@@ -10,9 +10,10 @@ on:
       - '!.github/workflows/release.yml'
   workflow_dispatch:
     inputs:
-      upload:
-        description: 'Skip Upload: Set to "y" to skip uploading the build.'
-        required: false
+      publish:
+        description: 'Post the APK to the Telegram channel'
+        type: boolean
+        default: true
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -93,9 +94,27 @@ jobs:
           export BUILD_TIMESTAMP=$(date +%s)
           echo "build_timestamp=$BUILD_TIMESTAMP" >> "$GITHUB_OUTPUT"
           ./gradlew TMessagesProj:assembleRelease
-      - name: Upload Artifacts
+      - name: Upload arm64-v8a Artifact
         uses: actions/upload-artifact@v7
         with:
           name: Release
           path: |
             TMessagesProj/build/outputs/apk/release/*.apk
+      - name: Send APK to Telegram
+        if: ${{ (github.event_name != 'workflow_dispatch' || inputs.publish) && !contains(github.event.head_commit.message, '[skip publish]') }}
+        env:
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_API_ID: ${{ secrets.TG_API_ID }}
+          TG_API_HASH: ${{ secrets.TG_API_HASH }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          COMMIT_SHA: ${{ github.sha }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          COMMITS_JSON: ${{ toJSON(github.event.commits) }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$TG_BOT_TOKEN" ] || [ -z "$TG_API_ID" ] || [ -z "$TG_API_HASH" ] || [ -z "$TG_CHAT_ID" ]; then
+            echo "секреты Telegram не заданы — отправка пропущена"
+            exit 0
+          fi
+          pip install --quiet kurigram tgcrypto
+          python3 .github/scripts/send_apk.py

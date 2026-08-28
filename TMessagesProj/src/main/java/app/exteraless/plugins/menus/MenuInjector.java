@@ -65,7 +65,7 @@ public final class MenuInjector {
 
     // ---------- общее ----------
 
-    /** Видимость пункта по MVEL-condition; null/пустое/ошибка вычисления = виден. */
+    /** Видимость пункта по MVEL-condition; null/пустое = виден, ошибка вычисления = скрыт. */
     public static boolean isVisible(MenuItemRecord item, Map<String, Object> context) {
         if (item.condition == null || item.condition.isEmpty()) {
             return true;
@@ -74,7 +74,7 @@ public final class MenuInjector {
             return MVEL.evalToBoolean(item.condition, context);
         } catch (Throwable t) {
             FileLog.e("MenuInjector: condition failed for " + item.pluginId + "/" + item.itemId, t);
-            return true;
+            return false;
         }
     }
 

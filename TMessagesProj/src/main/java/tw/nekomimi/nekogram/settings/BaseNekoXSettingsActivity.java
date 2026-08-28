@@ -239,11 +239,11 @@ public class BaseNekoXSettingsActivity extends BaseFragment {
         String key = getRowKey(position);
         String value = getRowValue(position);
         options.add(R.drawable.msg_link2, getString(R.string.CopyLink), () -> {
-            AndroidUtilities.addToClipboard(String.format(Locale.getDefault(), "https://%s/nasettings/%s?r=%s", getMessagesController().linkPrefix, prefix, key));
+            AndroidUtilities.addToClipboard(String.format(Locale.getDefault(), "https://%s/%s?r=%s", getMessagesController().linkPrefix, tw.nekomimi.nekogram.helpers.SettingsHelper.linkPathFor(prefix), key));
             BulletinFactory.of(this).createCopyLinkBulletin().show();
         });
         options.addIf(value != null && !value.isEmpty(), R.drawable.msg_copy, getString(R.string.BackupSettings), () -> {
-            AndroidUtilities.addToClipboard(String.format(Locale.getDefault(), "https://%s/nasettings/%s?r=%s&v=%s", getMessagesController().linkPrefix, prefix, key, value));
+            AndroidUtilities.addToClipboard(String.format(Locale.getDefault(), "https://%s/%s?r=%s&v=%s", getMessagesController().linkPrefix, tw.nekomimi.nekogram.helpers.SettingsHelper.linkPathFor(prefix), key, value));
             BulletinFactory.of(this).createCopyLinkBulletin().show();
         });
     }
@@ -496,31 +496,16 @@ public class BaseNekoXSettingsActivity extends BaseFragment {
         }
 
         protected View createDefaultViewByType(int viewType) {
-            View view = null;
-            switch (viewType) {
-                case CellGroup.ITEM_TYPE_DIVIDER:
-                    view = new ShadowSectionCell(mContext);
-                    break;
-                case CellGroup.ITEM_TYPE_TEXT_SETTINGS_CELL:
-                    view = new TextSettingsCell(mContext);
-                    break;
-                case CellGroup.ITEM_TYPE_TEXT_CHECK:
-                    view = new TextCheckCell(mContext);
-                    break;
-                case CellGroup.ITEM_TYPE_HEADER:
-                    view = new HeaderCell(mContext);
-                    break;
-                case CellGroup.ITEM_TYPE_TEXT_DETAIL:
-                    view = new TextDetailSettingsCell(mContext);
-                    break;
-                case CellGroup.ITEM_TYPE_TEXT:
-                    view = new TextInfoPrivacyCell(mContext);
-                    break;
-                case CellGroup.ITEM_TYPE_TEXT_CHECK_ICON:
-                    view = new TextCell(mContext);
-                    break;
-            }
-            return view;
+            return switch (viewType) {
+                case CellGroup.ITEM_TYPE_DIVIDER -> new ShadowSectionCell(mContext);
+                case CellGroup.ITEM_TYPE_TEXT_SETTINGS_CELL -> new TextSettingsCell(mContext);
+                case CellGroup.ITEM_TYPE_TEXT_CHECK -> new TextCheckCell(mContext);
+                case CellGroup.ITEM_TYPE_HEADER -> new HeaderCell(mContext);
+                case CellGroup.ITEM_TYPE_TEXT_DETAIL -> new TextDetailSettingsCell(mContext);
+                case CellGroup.ITEM_TYPE_TEXT -> new TextInfoPrivacyCell(mContext);
+                case CellGroup.ITEM_TYPE_TEXT_CHECK_ICON -> new TextCell(mContext);
+                default -> null;
+            };
         }
     }
 

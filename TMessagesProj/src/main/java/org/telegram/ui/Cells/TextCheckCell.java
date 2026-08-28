@@ -64,6 +64,7 @@ public class TextCheckCell extends FrameLayout {
     public CheckBoxSquare checkBoxSquare;
     private boolean needDivider;
     private boolean isMultiline;
+    private boolean wrapText;
     private int height = 50;
     private int animatedColorBackground;
     private float animationProgress;
@@ -174,8 +175,22 @@ public class TextCheckCell extends FrameLayout {
                 }
             }
         } else {
-            super.onMeasure(MeasureSpec.makeMeasureSpec(MeasureSpec.getSize(widthMeasureSpec), MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(valueTextView.getVisibility() == VISIBLE ? 64 : height) + (needDivider ? 3 : 0), MeasureSpec.EXACTLY));
+            final int fixed = AndroidUtilities.dp(valueTextView.getVisibility() == VISIBLE ? 64 : height);
+            // Название в neko-ячейках переносится без ограничения по строкам,
+            // а высота оставалась фиксированной — со второй строки текст резало.
+            final int wanted = wrapText
+                    ? Math.max(fixed, wrappedTitleHeight(MeasureSpec.getSize(widthMeasureSpec)))
+                    : fixed;
+            super.onMeasure(MeasureSpec.makeMeasureSpec(MeasureSpec.getSize(widthMeasureSpec), MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(wanted + (needDivider ? 3 : 0), MeasureSpec.EXACTLY));
         }
+    }
+
+    private int wrappedTitleHeight(int parentWidth) {
+        final LayoutParams params = (LayoutParams) textView.getLayoutParams();
+        final int available = Math.max(0, parentWidth - params.leftMargin - params.rightMargin);
+        textView.measure(MeasureSpec.makeMeasureSpec(available, MeasureSpec.EXACTLY),
+                MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
+        return textView.getMeasuredHeight() + AndroidUtilities.dp(30);
     }
 
     @Override
@@ -211,7 +226,12 @@ public class TextCheckCell extends FrameLayout {
             textView.setLines(0);
             textView.setMaxLines(0);
             textView.setSingleLine(false);
+        } else {
+            textView.setLines(1);
+            textView.setMaxLines(1);
+            textView.setSingleLine(true);
         }
+        wrapText = isNekoCell;
         isMultiline = false;
         if (checkBox != null) {
             checkBox.setVisibility(View.VISIBLE);
@@ -302,6 +322,7 @@ public class TextCheckCell extends FrameLayout {
         }
         needDivider = divider;
         valueTextView.setVisibility(VISIBLE);
+        wrapText = false;
         isMultiline = multiline;
         if (multiline) {
             if (isNekoCell) {
@@ -349,6 +370,7 @@ public class TextCheckCell extends FrameLayout {
         checkBox.setVisibility(View.GONE);
         needDivider = divider;
         valueTextView.setVisibility(VISIBLE);
+        wrapText = false;
         isMultiline = multiline;
         if (multiline) {
             valueTextView.setLines(0);

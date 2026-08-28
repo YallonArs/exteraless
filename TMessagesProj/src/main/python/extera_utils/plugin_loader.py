@@ -67,6 +67,7 @@ __all__ = [
     "plugin_context", "current_plugin_id",
     # песочница
     "caller_plugin_id", "has_permission", "require_permission", "plugin_files",
+    "unsafe_mode", "set_unsafe_mode",
     "PERM_UI", "PERM_MESSAGES_READ", "PERM_MESSAGES_SEND", "PERM_NETWORK",
     "PERM_FILES", "PERM_INTENTS", "PERM_SETTINGS", "PERM_HOOKS", "PERM_NATIVE",
 ]
@@ -383,7 +384,7 @@ _INTERNAL_MODULES = frozenset({
 
 def _deny_internal_import(name, fromlist=()) -> None:
     """Бросить ImportError, если плагин лезет во внутренний модуль движка."""
-    if type(name) is not str:
+    if type(name) is not str or unsafe_mode():
         return
     candidates = [name]
     if fromlist:
@@ -452,7 +453,6 @@ _JAVA_CLASS_DENIED = frozenset({
     "app.exteraless.plugins.files.FilesControllerJava",
     "app.exteraless.plugins.intents.IntentsDispatcher",
     "app.exteraless.plugins.menus.MenusController",
-    "java.lang.Runtime",
     "java.lang.ProcessBuilder",
     "java.lang.Process",
 })
@@ -485,6 +485,8 @@ def guard_java_class(name):
     (app.exteraless.plugins.PluginSinkGate), эта проверка лишь снимает самый
     ходовой путь: 178 плагинов зовут find_class, 94 — jclass.
     """
+    if unsafe_mode():
+        return True
     if name in _JAVA_CLASS_DENIED:
         pid = plugin_frame_owner()
         if pid is not None:
@@ -707,6 +709,8 @@ def _permissions():
 
 def has_permission(perm: str, plugin_id: Optional[str] = None) -> bool:
     """Тихая проверка. Вне кода плагина и без JVM — True (гейтить нечего)."""
+    if unsafe_mode():
+        return True
     pid = plugin_id or caller_plugin_id()
     if pid is None:
         return True
@@ -717,6 +721,27 @@ def has_permission(perm: str, plugin_id: Optional[str] = None) -> bool:
         return bool(java.hasPermission(pid, perm))
     except Exception:
         return True
+
+
+_unsafe_mode: Optional[bool] = None
+
+
+def set_unsafe_mode(value) -> None:
+    global _unsafe_mode
+    _unsafe_mode = bool(value)
+
+
+def unsafe_mode() -> bool:
+    global _unsafe_mode
+    if _unsafe_mode is None:
+        java = _permissions()
+        if java is None:
+            return False
+        try:
+            _unsafe_mode = bool(java.isUnsafeMode())
+        except Exception:
+            return False
+    return _unsafe_mode
 
 
 def require_permission(perm: str, what: str, detail: Optional[str] = None,
@@ -732,6 +757,8 @@ def require_permission(perm: str, what: str, detail: Optional[str] = None,
     исключения, иначе множество дедупликации на Java-стороне росло бы
     на каждый новый путь.
     """
+    if unsafe_mode():
+        return
     pid = plugin_id or caller_plugin_id()
     if pid is None:
         return
@@ -1057,6 +1084,104 @@ def _install_jclass_guard() -> None:
         print(f"[exteraless:plugin_loader] jclass guard failed: {e}", file=sys.stderr)
 
 
+_PROXY_DEFAULTS = {
+    "void": None,
+    "boolean": False,
+    "byte": 0,
+    "short": 0,
+    "int": 0,
+    "long": 0,
+    "float": 0.0,
+    "double": 0.0,
+    "char": "\0",
+}
+
+
+def _proxy_return_defaults(interfaces):
+    defaults = {}
+    for interface in interfaces:
+        try:
+            methods = interface.getClass().getMethods()
+        except Exception:
+            continue
+        for index in range(len(methods)):
+            try:
+                method = methods[index]
+                name = str(method.getName())
+                if name in defaults:
+                    continue
+                defaults[name] = _PROXY_DEFAULTS.get(
+                    str(method.getReturnType().getName()))
+            except Exception:
+                continue
+    return defaults
+
+
+def _guard_proxy_method(fn, default, owner):
+    import functools
+
+    @functools.wraps(fn)
+    def guarded(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except PermissionError as e:
+            print(f"[exteraless:plugin_loader] {owner}.{fn.__name__} denied: {e}",
+                  file=sys.stderr)
+            return default
+        except Exception:
+            import traceback
+            print(f"[exteraless:plugin_loader] {owner}.{fn.__name__} "
+                  f"raised into Java:\n{traceback.format_exc()}", file=sys.stderr)
+            return default
+
+    guarded._exteraless_guarded = True
+    return guarded
+
+
+def _guard_proxy_subclass(cls, defaults):
+    for name, value in list(vars(cls).items()):
+        if name.startswith("__") or not callable(value):
+            continue
+        if defaults and name not in defaults:
+            continue
+        if getattr(value, "_exteraless_guarded", False):
+            continue
+        if isinstance(value, (staticmethod, classmethod, type)):
+            continue
+        try:
+            setattr(cls, name, _guard_proxy_method(value, defaults.get(name), cls.__name__))
+        except Exception:
+            continue
+
+
+def _install_dynamic_proxy_guard() -> None:
+    try:
+        import java
+        original = getattr(java, "dynamic_proxy", None)
+        if original is None or getattr(original, "_exteraless_guard", False):
+            return
+
+        def dynamic_proxy(*interfaces, **kwargs):
+            base = original(*interfaces, **kwargs)
+            try:
+                defaults = _proxy_return_defaults(interfaces)
+
+                def __init_subclass__(cls, **subclass_kwargs):
+                    _guard_proxy_subclass(cls, defaults)
+
+                base.__init_subclass__ = classmethod(__init_subclass__)
+            except Exception as e:
+                print(f"[exteraless:plugin_loader] proxy guard skipped: {e}",
+                      file=sys.stderr)
+            return base
+
+        dynamic_proxy._exteraless_guard = True
+        java.dynamic_proxy = dynamic_proxy
+    except Exception as e:
+        print(f"[exteraless:plugin_loader] dynamic_proxy guard failed: {e}",
+              file=sys.stderr)
+
+
 def _install_sandbox() -> None:
     """Поставить финдер и врапперы импорта/open. Идемпотентно, не бросает."""
     global _original_import, _original_import_module, _original_open
@@ -1083,6 +1208,7 @@ def _install_sandbox() -> None:
         audit_gate.install(sys.modules[__name__])
         _install_thread_marking()
         _install_jclass_guard()
+        _install_dynamic_proxy_guard()
         from . import class_aliases
         class_aliases.install_import_hook()
         if not any(isinstance(finder, _PermissionFinder) for finder in sys.meta_path):
@@ -1264,12 +1390,30 @@ def _import_module(path: str, plugin_id: str):
     return module, module_name
 
 
-def _find_plugin_class(module, path: str):
-    """The plugin class: a BasePlugin subclass defined in the plugin module itself."""
+def _class_owner(obj) -> Optional[str]:
+    source = sys.modules.get(getattr(obj, "__module__", "") or "")
+    path = getattr(source, "__file__", None)
+    if not path:
+        return None
+    try:
+        return _resolve_owner(path)
+    except Exception:
+        return None
+
+
+def _find_plugin_class(module, path: str, plugin_id: Optional[str] = None):
+    fallback = None
     for obj in vars(module).values():
-        if isinstance(obj, type) and issubclass(obj, BasePlugin) \
-                and obj is not BasePlugin and obj.__module__ == module.__name__:
+        if not isinstance(obj, type) or not issubclass(obj, BasePlugin) or obj is BasePlugin:
+            continue
+        if obj.__module__ == module.__name__:
             return obj
+        if fallback is None:
+            owner = _class_owner(obj)
+            if owner is None or owner == plugin_id:
+                fallback = obj
+    if fallback is not None:
+        return fallback
     raise RuntimeError(f"no BasePlugin subclass defined in {path!r}")
 
 
@@ -1335,7 +1479,7 @@ def load_plugin(path: str, plugin_id: str) -> str:
             _ensure_requirements(plugin_id, meta["requirements"])
 
         module, module_name = _import_module(path, plugin_id)
-        plugin_class = _find_plugin_class(module, path)
+        plugin_class = _find_plugin_class(module, path, plugin_id)
         instance = plugin_class()
         instance._attach(plugin_id)
         plugins[plugin_id] = PluginRecord(module=module, instance=instance, path=path,
@@ -1625,10 +1769,103 @@ def _attach_callbacks(data: dict, item, record: PluginRecord, ident: str) -> Non
     _put(data, "long_callback_id", _register_long_click(item, record, ident))
 
 
+def _java_setting_kind(item) -> Optional[str]:
+    if isinstance(item, (ui_settings.Header, ui_settings.Divider, ui_settings.Switch,
+                         ui_settings.Selector, ui_settings.Input, ui_settings.Text,
+                         ui_settings.EditText, ui_settings.Custom)):
+        return None
+    getter = getattr(item, "getType", None)
+    if getter is None or getattr(item, "getClass", None) is None:
+        return None
+    try:
+        kind = getter()
+    except Exception:
+        return None
+    return kind if isinstance(kind, str) else None
+
+
+def _java_get(item, name, fallback=None):
+    getter = getattr(item, name, None)
+    if getter is None:
+        return fallback
+    try:
+        value = getter()
+    except Exception:
+        return fallback
+    return fallback if value is None else value
+
+
+def _from_java_setting(item, kind: str):
+    s = ui_settings
+    icon = _java_get(item, "getIcon")
+    long_click = _java_get(item, "getOnLongClickCallback")
+    alias = _java_get(item, "getLinkAlias")
+    if kind == "header":
+        return s.Header(text=_java_get(item, "getText", ""))
+    if kind == "divider":
+        return s.Divider(text=_java_get(item, "getText"))
+    if kind == "switch":
+        return s.Switch(key=_java_get(item, "getKey", ""),
+                        text=_java_get(item, "getText", ""),
+                        default=bool(_java_get(item, "getDefaultValue", False)),
+                        subtext=_java_get(item, "getSubtext"), icon=icon,
+                        on_change=_java_get(item, "getOnChangeCallback"),
+                        on_long_click=long_click, link_alias=alias)
+    if kind == "selector":
+        items = _java_get(item, "getItems", [])
+        return s.Selector(key=_java_get(item, "getKey", ""),
+                          text=_java_get(item, "getText", ""),
+                          default=int(_java_get(item, "getDefaultValue", 0)),
+                          items=[str(entry) for entry in items],
+                          subtext=_java_get(item, "getSubtext"), icon=icon,
+                          on_change=_java_get(item, "getOnChangeCallback"),
+                          on_long_click=long_click, link_alias=alias)
+    if kind == "input":
+        return s.Input(key=_java_get(item, "getKey", ""),
+                       text=_java_get(item, "getText", ""),
+                       default=_java_get(item, "getDefaultValue"),
+                       subtext=_java_get(item, "getSubtext"), icon=icon,
+                       on_change=_java_get(item, "getOnChangeCallback"),
+                       on_long_click=long_click, link_alias=alias)
+    if kind == "edit_text":
+        max_length = _java_get(item, "getMaxLength", 0)
+        return s.EditText(key=_java_get(item, "getKey", ""),
+                          hint=_java_get(item, "getHint", ""),
+                          default=_java_get(item, "getDefaultValue", ""),
+                          multiline=bool(_java_get(item, "getMultiline", False)),
+                          max_length=int(max_length) or None,
+                          mask=_java_get(item, "getMask"),
+                          on_change=_java_get(item, "getOnChangeCallback"))
+    if kind == "text":
+        return s.Text(text=_java_get(item, "getText", ""),
+                      subtext=_java_get(item, "getSubtext"), icon=icon,
+                      accent=bool(_java_get(item, "getAccent", False)),
+                      red=bool(_java_get(item, "getRed", False)),
+                      on_click=_java_get(item, "getOnClickCallback"),
+                      on_long_click=long_click,
+                      create_sub_fragment=_java_get(item, "getCreateSubFragmentCallback"),
+                      link_alias=alias)
+    if kind == "custom":
+        return s.Custom(item=_java_get(item, "getItem"),
+                        view=_java_get(item, "getView"),
+                        factory=_java_get(item, "getFactory"),
+                        on_click=_java_get(item, "getOnClickCallback"),
+                        on_long_click=long_click,
+                        create_sub_fragment=_java_get(item, "getCreateSubFragmentCallback"),
+                        link_alias=alias)
+    return None
+
+
 def _serialize_setting_item(item, record: PluginRecord, scope: str = "",
                             index: int = 0) -> Optional[dict]:
     s = ui_settings
     instance = record.instance
+    kind = _java_setting_kind(item)
+    if kind is not None:
+        converted = _from_java_setting(item, kind)
+        if converted is None:
+            return None
+        item = converted
     ident = _item_ident(item, scope, index)
 
     if isinstance(item, s.Header):
@@ -1658,7 +1895,9 @@ def _serialize_setting_item(item, record: PluginRecord, scope: str = "",
             "text": item.text,
             "items": [str(entry) for entry in item.items],
             "value": instance.get_setting(item.key, item.default),
+            "default": item.default,
         }
+        _put(data, "subtext", item.subtext)
         _put(data, "icon", item.icon)
         _attach_callbacks(data, item, record, ident)
         return data
@@ -1846,6 +2085,9 @@ def _build_custom_view(item, context):
     factory = getattr(item, "factory", None)
     if factory is None:
         return None
+    build = getattr(factory, "build_view", None)
+    if callable(build):
+        return build(context, False)
     create = getattr(factory, "create_view", None)
     if not callable(create):
         return None

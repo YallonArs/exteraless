@@ -32,6 +32,7 @@ import org.telegram.messenger.UserConfig;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_stars;
 import org.telegram.ui.ActionBar.BaseFragment;
+import org.telegram.ui.ActionBar.MessageDrawable;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.AnimatedEmojiDrawable;
 import org.telegram.ui.Components.Easings;
@@ -55,9 +56,9 @@ public class DoubleTapCell extends LinearLayout {
     private final Paint outlinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint[] circleOutlinePaint = new Paint[2];
 
-    private final Theme.MessageDrawable[] messages = new Theme.MessageDrawable[]{
-            new Theme.MessageDrawable(Theme.MessageDrawable.TYPE_TEXT, false, false),
-            new Theme.MessageDrawable(Theme.MessageDrawable.TYPE_TEXT, true, false)
+    private final MessageDrawable[] messages = new MessageDrawable[]{
+            new MessageDrawable(MessageDrawable.TYPE_TEXT, false, false),
+            new MessageDrawable(MessageDrawable.TYPE_TEXT, true, false)
     };
 
     // Иконки по индексам действий NagramX DoubleTap (0..10).

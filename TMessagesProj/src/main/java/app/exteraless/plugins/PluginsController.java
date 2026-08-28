@@ -5,9 +5,13 @@ import android.content.SharedPreferences;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.FileLog;
+import org.telegram.messenger.NotificationCenter;
+import org.telegram.ui.ActionBar.BaseFragment;
+import org.telegram.ui.LaunchActivity;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -16,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
@@ -25,6 +30,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Реестр и фасад движка плагинов. Аналог PluginsController.java exteraGram (1842 строки),
@@ -75,6 +81,8 @@ public class PluginsController extends com.exteragram.messenger.plugins.PluginsC
     private final Map<String, List<String>> updateHooks = new ConcurrentHashMap<>();
     /** имя контейнера апдейтов (TL_updates и т.п.) -> список pluginId. */
     private final Map<String, List<String>> updatesContainerHooks = new ConcurrentHashMap<>();
+
+    private final Map<String, Integer> hookPriorities = new ConcurrentHashMap<>();
     private final List<MenuItemRecord> menuItems = Collections.synchronizedList(new ArrayList<>());
     /** Слушатель открытого экрана настроек плагина. */
     private final Map<String, List<Runnable>> settingsReloadListeners = new ConcurrentHashMap<>();
@@ -141,7 +149,10 @@ public class PluginsController extends com.exteragram.messenger.plugins.PluginsC
     }
 
     public void setEngineEnabled(boolean enabled) {
-        preferences.edit().putBoolean(PluginsConstants.KEY_ENGINE_ENABLED, enabled).apply();
+        preferences.edit()
+                .putBoolean(PluginsConstants.KEY_ENGINE_ENABLED, enabled)
+                .remove(PluginsConstants.KEY_NATIVE_HOOKS_BROKEN)
+                .apply();
         if (enabled && initialized) {
             PythonPluginsEngine.getInstance().ensureStarted(appContext, ok -> {
                 if (ok) {
@@ -160,6 +171,25 @@ public class PluginsController extends com.exteragram.messenger.plugins.PluginsC
     public void setSafeMode(boolean safeMode) {
         preferences.edit().putBoolean(PluginsConstants.KEY_SAFE_MODE, safeMode).apply();
     }
+
+    public boolean isUnsafeMode() {
+        if (unsafeMode == null) {
+            unsafeMode = preferences != null
+                    && preferences.getBoolean(PluginsConstants.KEY_UNSAFE_MODE, false);
+        }
+        return unsafeMode;
+    }
+
+    public void setUnsafeMode(boolean value) {
+        unsafeMode = value;
+        if (preferences != null) {
+            preferences.edit().putBoolean(PluginsConstants.KEY_UNSAFE_MODE, value).apply();
+        }
+        FileLog.w("PluginsController: unsafe mode " + (value ? "ON" : "off"));
+        PythonPluginsEngine.getInstance().setUnsafeMode(value);
+    }
+
+    private Boolean unsafeMode;
 
     public boolean isDeveloperMode() {
         return preferences != null && preferences.getBoolean(PluginsConstants.KEY_DEVELOPER_MODE, false);
@@ -216,15 +246,19 @@ public class PluginsController extends com.exteragram.messenger.plugins.PluginsC
         }
     }
 
-    public synchronized List<Plugin> getPlugins() {
+    public synchronized List<Plugin> getPluginsSnapshot() {
         return new ArrayList<>(plugins.values());
     }
 
     /**
-     * Живая карта id → плагин. Имя и тип совпадают с полем {@code plugins}
-     * внешнего контроллера: опубликованные плагины ходят в неё через шим
-     * {@code com.exteragram.messenger.plugins.PluginsController.plugins}.
+     * Живая карта id → плагин, как {@code getPlugins()} эталона: dex-модули берут
+     * её рефлексией и зовут у результата {@code values()}.
      */
+    @Override
+    public Map<String, Plugin> getPlugins() {
+        return plugins;
+    }
+
     public Map<String, Plugin> getPluginsMap() {
         return plugins;
     }
@@ -409,7 +443,7 @@ public class PluginsController extends com.exteragram.messenger.plugins.PluginsC
         }
     }
 
-    /** Проверка __app_version__/__sdk_version__ (операторы >=, <=, ==, >, <). */
+    /** Проверка __app_version__/__sdk_version__ (операторы >=, <=, ==, >, <; без оператора — >=). */
     private String checkVersionConstraints(Plugin p) {
         if (p.appVersion != null && !checkVersionConstraint(p.appVersion, BuildVars.BUILD_VERSION_STRING)) {
             return "requires app " + p.appVersion;
@@ -424,7 +458,7 @@ public class PluginsController extends com.exteragram.messenger.plugins.PluginsC
         if (constraint == null || constraint.isEmpty()) {
             return true;
         }
-        String op = "==";
+        String op = ">=";
         String version = constraint.trim();
         // Ограничение без единой цифры — это не версия: пустая строка, "null",
         // мусор из метаданных. Считать такое невыполненным нельзя, иначе плагин
@@ -486,7 +520,7 @@ public class PluginsController extends com.exteragram.messenger.plugins.PluginsC
             FileLog.d("PluginsController: safe mode, no plugins loaded");
             return;
         }
-        List<Plugin> snapshot = getPlugins();
+        List<Plugin> snapshot = getPluginsSnapshot();
         for (Plugin p : snapshot) {
             if (p.enabled && p.loadError == null) {
                 loadPluginInternal(p);
@@ -536,6 +570,7 @@ public class PluginsController extends com.exteragram.messenger.plugins.PluginsC
                 p.loadError = null;
                 p.loadDebug = null;
                 p.hasSettings = root.optBoolean("has_settings", false);
+                notifyPluginSettings(p.id, p.hasSettings);
                 return true;
             }
             p.loaded = false;
@@ -550,7 +585,7 @@ public class PluginsController extends com.exteragram.messenger.plugins.PluginsC
     }
 
     private void unloadAll() {
-        List<Plugin> snapshot = getPlugins();
+        List<Plugin> snapshot = getPluginsSnapshot();
         for (Plugin p : snapshot) {
             if (p.loaded) {
                 unregisterPluginHooks(p.id);
@@ -562,6 +597,7 @@ public class PluginsController extends com.exteragram.messenger.plugins.PluginsC
         requestHooksSubstring.clear();
         updateHooks.clear();
         updatesContainerHooks.clear();
+        hookPriorities.clear();
         synchronized (menuItems) {
             menuItems.clear();
         }
@@ -677,6 +713,10 @@ public class PluginsController extends com.exteragram.messenger.plugins.PluginsC
      * Валидация метаданных — до копирования; при совпадении id — перезапись.
      */
     public void installPlugin(File source, InstallCallback callback) {
+        installPlugin(source, true, callback);
+    }
+
+    public void installPlugin(File source, boolean enable, InstallCallback callback) {
         fileExecutor.execute(() -> {
             PythonPluginsEngine engine = PythonPluginsEngine.getInstance();
             if (!awaitEngineStarted()) {
@@ -717,8 +757,8 @@ public class PluginsController extends com.exteragram.messenger.plugins.PluginsC
                     deliver(callback, false, "metadata parse error", null);
                     return;
                 }
-                p.enabled = true;
-                preferences.edit().putBoolean(PluginsConstants.KEY_PLUGIN_ENABLED_PREFIX + id, true).apply();
+                p.enabled = enable;
+                preferences.edit().putBoolean(PluginsConstants.KEY_PLUGIN_ENABLED_PREFIX + id, enable).apply();
                 // Согласие пользователя записывает диалог установки (PluginPermissions.setGranted).
                 // Если он этого не сделал, запись всё равно должна появиться: без неё
                 // свежепоставленный плагин уедет в режим совместимости, где ему дают всё.
@@ -730,7 +770,7 @@ public class PluginsController extends com.exteragram.messenger.plugins.PluginsC
                 synchronized (this) {
                     plugins.put(id, p);
                 }
-                if (!isSafeMode()) {
+                if (enable && !isSafeMode()) {
                     loadPluginInternal(p);
                 }
                 if (p.loadError != null) {
@@ -824,6 +864,15 @@ public class PluginsController extends com.exteragram.messenger.plugins.PluginsC
     }
 
     /** Есть ли у плагина сохранённые настройки (кнопка сброса показывается только тогда). */
+    private static void notifyPluginSettings(String pluginId, boolean hasSettings) {
+        if (pluginId == null || pluginId.isEmpty()) {
+            return;
+        }
+        AndroidUtilities.runOnUIThread(() -> NotificationCenter.getGlobalInstance().postNotificationName(
+                hasSettings ? NotificationCenter.pluginSettingsRegistered
+                        : NotificationCenter.pluginSettingsUnregistered, pluginId));
+    }
+
     public boolean hasPluginSettingsPreferences(String pluginId) {
         return appContext != null && pluginId != null && !pluginPrefs(pluginId).getAll().isEmpty();
     }
@@ -892,6 +941,27 @@ public class PluginsController extends com.exteragram.messenger.plugins.PluginsC
         Map<String, PythonPluginsEngine> engines = new ConcurrentHashMap<>();
         engines.put(PluginsConstants.PYTHON, PythonPluginsEngine.getInstance());
         return engines;
+    }
+
+    public static void openPluginSettings(String pluginId) {
+        openPluginSettings(pluginId, null);
+    }
+
+    public static void openPluginSettings(String pluginId, String targetSetting) {
+        if (pluginId == null || pluginId.isEmpty()) {
+            return;
+        }
+        AndroidUtilities.runOnUIThread(() -> {
+            Plugin plugin = getInstance().getPlugin(pluginId);
+            if (plugin == null) {
+                return;
+            }
+            BaseFragment fragment = LaunchActivity.getSafeLastFragment();
+            if (fragment == null) {
+                return;
+            }
+            PythonPluginsEngine.getInstance().openPluginSettings(plugin, fragment, targetSetting);
+        });
     }
 
     public void importPluginSettings(String pluginId, String json, boolean reloadSettings) {
@@ -1013,6 +1083,35 @@ public class PluginsController extends com.exteragram.messenger.plugins.PluginsC
                 list.add(pluginId);
             }
         }
+        hookPriorities.merge(priorityKey(requestName, pluginId), priority, Math::max);
+    }
+
+    private static String priorityKey(String hookName, String pluginId) {
+        return hookName + '\u0001' + pluginId;
+    }
+
+    private int hookPriority(String hookName, String pluginId) {
+        Integer stored = hookPriorities.get(priorityKey(hookName, pluginId));
+        return stored != null ? stored : 0;
+    }
+
+    private static List<String> byPriority(Map<String, Integer> priorities) {
+        List<String> ordered = new ArrayList<>(priorities.keySet());
+        ordered.sort(Comparator
+                .comparingInt((String id) -> priorities.get(id)).reversed()
+                .thenComparing(Comparator.<String>naturalOrder()));
+        return ordered;
+    }
+
+    private List<String> orderedTargets(String hookName, List<String> pluginIds) {
+        if (pluginIds == null || pluginIds.size() < 2) {
+            return pluginIds == null ? new ArrayList<>() : new ArrayList<>(pluginIds);
+        }
+        Map<String, Integer> priorities = new HashMap<>();
+        for (String pluginId : pluginIds) {
+            priorities.merge(pluginId, hookPriority(hookName, pluginId), Math::max);
+        }
+        return byPriority(priorities);
     }
 
     /** Снять один request-хук плагина (SDK: {@code remove_hook(name)}). */
@@ -1026,6 +1125,7 @@ public class PluginsController extends com.exteragram.messenger.plugins.PluginsC
         synchronized (requestHooksSubstring) {
             dropPluginFromKey(requestHooksSubstring, requestName, pluginId);
         }
+        hookPriorities.remove(priorityKey(requestName, pluginId));
     }
 
     /** Снять хук исходящих сообщений (SDK: {@code remove_hook("on_send_message_hook")}). */
@@ -1061,6 +1161,7 @@ public class PluginsController extends com.exteragram.messenger.plugins.PluginsC
 
     public void unregisterPluginHooks(String pluginId) {
         sendMessageHooks.remove(pluginId);
+        hookPriorities.keySet().removeIf(k -> k.endsWith('\u0001' + pluginId));
         synchronized (requestHooks) {
             dropPluginFrom(requestHooks, pluginId);
         }
@@ -1090,7 +1191,7 @@ public class PluginsController extends com.exteragram.messenger.plugins.PluginsC
         if (!PythonPluginsEngine.getInstance().isStarted()) {
             return;
         }
-        List<Plugin> snapshot = getPlugins();
+        List<Plugin> snapshot = getPluginsSnapshot();
         for (Plugin p : snapshot) {
             if (p.loaded) {
                 PythonPluginsEngine.getInstance().callAppEvent(p.id, event);
@@ -1204,21 +1305,25 @@ public class PluginsController extends com.exteragram.messenger.plugins.PluginsC
     }
 
     private List<String> findRequestHookTargets(String requestName) {
-        List<String> result = new ArrayList<>();
+        Map<String, Integer> priorities = new HashMap<>();
         synchronized (requestHooks) {
             List<String> exact = requestHooks.get(requestName);
             if (exact != null) {
-                result.addAll(exact);
+                for (String pluginId : exact) {
+                    priorities.merge(pluginId, hookPriority(requestName, pluginId), Math::max);
+                }
             }
         }
         synchronized (requestHooksSubstring) {
             for (Map.Entry<String, List<String>> e : requestHooksSubstring.entrySet()) {
                 if (requestName != null && requestName.contains(e.getKey())) {
-                    result.addAll(e.getValue());
+                    for (String pluginId : e.getValue()) {
+                        priorities.merge(pluginId, hookPriority(e.getKey(), pluginId), Math::max);
+                    }
                 }
             }
         }
-        return result;
+        return byPriority(priorities);
     }
 
     // ---------- хуки апдейтов ----------
@@ -1235,8 +1340,7 @@ public class PluginsController extends com.exteragram.messenger.plugins.PluginsC
     public HookResult executeOnUpdateHook(int account, String updateName, Object update) {
         List<String> targets;
         synchronized (updateHooks) {
-            List<String> exact = updateHooks.get(updateName);
-            targets = exact != null ? new ArrayList<>(exact) : new ArrayList<>();
+            targets = orderedTargets(updateName, updateHooks.get(updateName));
         }
         if (targets.isEmpty() || !PythonPluginsEngine.getInstance().isStarted()) {
             return HookResult.DEFAULT;
@@ -1266,8 +1370,7 @@ public class PluginsController extends com.exteragram.messenger.plugins.PluginsC
     public HookResult executeOnUpdatesHook(int account, String containerName, Object updates) {
         List<String> targets;
         synchronized (updatesContainerHooks) {
-            List<String> exact = updatesContainerHooks.get(containerName);
-            targets = exact != null ? new ArrayList<>(exact) : new ArrayList<>();
+            targets = orderedTargets(containerName, updatesContainerHooks.get(containerName));
         }
         if (targets.isEmpty() || !PythonPluginsEngine.getInstance().isStarted()) {
             return HookResult.DEFAULT;
@@ -1336,13 +1439,15 @@ public class PluginsController extends com.exteragram.messenger.plugins.PluginsC
 
     // ---------- меню ----------
 
+    private static final AtomicLong generatedMenuItemId = new AtomicLong();
+
     public String registerMenuItem(String pluginId, String jsonMenuItem,
                                    com.chaquo.python.PyObject onClick) {
         try {
             JSONObject obj = new JSONObject(jsonMenuItem);
             String itemId = obj.optString("item_id");
             if (itemId == null || itemId.isEmpty()) {
-                itemId = pluginId + "_" + System.currentTimeMillis();
+                itemId = pluginId + "_" + generatedMenuItemId.incrementAndGet();
             }
             final String finalItemId = itemId;
             MenuItemRecord record = new MenuItemRecord(

@@ -2,6 +2,7 @@ package app.exteraless.plugins.xposed;
 
 import com.chaquo.python.PyObject;
 
+import java.util.Collections;
 import java.util.List;
 
 import de.robv.android.xposed.XC_MethodHook;
@@ -25,13 +26,39 @@ public class PyMethodHook extends XC_MethodHook {
     private final List<HookFilter> beforeFilters;
     private final List<HookFilter> afterFilters;
 
+    public PyMethodHook(String pluginId, PyObject handler) {
+        this(pluginId, handler, PRIORITY_DEFAULT, true, true);
+    }
+
+    public PyMethodHook(String pluginId, PyObject handler, int priority) {
+        this(pluginId, handler, priority, true, true);
+    }
+
+    public PyMethodHook(String pluginId, PyObject handler, boolean before, boolean after) {
+        this(pluginId, handler, PRIORITY_DEFAULT, before, after);
+    }
+
     public PyMethodHook(String pluginId, PyObject handler, int priority,
+                 boolean before, boolean after) {
+        this(pluginId, handler, priority, before, after,
+                Collections.emptyList(), Collections.emptyList());
+    }
+
+    public PyMethodHook(String pluginId, PyObject handler, int priority,
+                 List<HookFilter> beforeFilters, List<HookFilter> afterFilters) {
+        this(pluginId, handler, priority, true, true, beforeFilters, afterFilters);
+    }
+
+    private PyMethodHook(String pluginId, PyObject handler, int priority,
+                 boolean before, boolean after,
                  List<HookFilter> beforeFilters, List<HookFilter> afterFilters) {
         super(priority);
         this.pluginId = pluginId;
         this.handler = handler;
-        this.hasBefore = handler.containsKey("before_hooked_method");
-        this.hasAfter = handler.containsKey("after_hooked_method");
+        this.hasBefore = before && handler != null
+                && handler.containsKey("before_hooked_method");
+        this.hasAfter = after && handler != null
+                && handler.containsKey("after_hooked_method");
         this.beforeFilters = beforeFilters;
         this.afterFilters = afterFilters;
     }

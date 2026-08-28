@@ -34,15 +34,16 @@ import com.google.zxing.RGBLuminanceSource
 import com.google.zxing.WriterException
 import com.google.zxing.common.GlobalHistogramBinarizer
 import com.google.zxing.qrcode.QRCodeReader
-import com.google.zxing.qrcode.QRCodeWriter
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import org.telegram.messenger.AndroidUtilities
 import org.telegram.messenger.ApplicationLoader
 import org.telegram.messenger.FileLog
 import org.telegram.messenger.LocaleController.getString
+import org.telegram.messenger.MessagesController
 import org.telegram.messenger.NotificationCenter
 import org.telegram.messenger.R
 import org.telegram.messenger.SharedConfig
+import org.telegram.messenger.TelegramQRCodeWriter
 import org.telegram.messenger.browser.Browser
 import tw.nekomimi.nekogram.ui.BottomBuilder
 import tw.nekomimi.nekogram.utils.AlertUtil.showToast
@@ -52,6 +53,14 @@ import java.io.File
 object ProxyUtil {
 
     private var networkCallbackRegistered = false
+
+    private const val PROXY_AUTO_DISABLED_KEY = "oe_proxy_auto_disabled"
+
+    private var proxyAutoDisabled: Boolean
+        get() = MessagesController.getGlobalMainSettings()
+            .getBoolean(PROXY_AUTO_DISABLED_KEY, false)
+        set(value) = MessagesController.getGlobalMainSettings().edit()
+            .putBoolean(PROXY_AUTO_DISABLED_KEY, value).apply()
 
     /**
      * Подходит ли текущая сеть под условия автоотключения прокси.
@@ -70,6 +79,23 @@ object ProxyUtil {
             capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
     }
 
+    private fun applyProxyDisableConditions(disable: Boolean) {
+        if (disable) {
+            if (!SharedConfig.isProxyEnabled() || SharedConfig.currentProxy == null) return
+            proxyAutoDisabled = true
+            SharedConfig.setProxyEnable(false)
+        } else {
+            if (!proxyAutoDisabled) return
+            proxyAutoDisabled = false
+            if (SharedConfig.isProxyEnabled() || SharedConfig.currentProxy == null) return
+            SharedConfig.setProxyEnable(true)
+        }
+        AndroidUtilities.runOnUIThread {
+            NotificationCenter.getGlobalInstance()
+                .postNotificationName(NotificationCenter.proxySettingsChanged)
+        }
+    }
+
     @JvmStatic
     fun registerNetworkCallback() {
         if (networkCallbackRegistered) return
@@ -81,23 +107,7 @@ object ProxyUtil {
                 override fun onAvailable(network: Network) {
                     val networkCapabilities =
                         connectivityManager.getNetworkCapabilities(network) ?: return
-                    val disable = shouldDisableProxyOn(networkCapabilities)
-                    if (!disable) {
-                        if (SharedConfig.currentProxy == null) {
-                            if (!SharedConfig.proxyList.isEmpty()) {
-                                SharedConfig.setCurrentProxy(SharedConfig.proxyList[0])
-                            } else {
-                                return
-                            }
-                        }
-                    }
-                    if ((SharedConfig.isProxyEnabled() && disable) || (!SharedConfig.isProxyEnabled() && !disable)) {
-                        SharedConfig.setProxyEnable(!disable)
-                        AndroidUtilities.runOnUIThread {
-                            NotificationCenter.getGlobalInstance()
-                                .postNotificationName(NotificationCenter.proxySettingsChanged)
-                        }
-                    }
+                    applyProxyDisableConditions(shouldDisableProxyOn(networkCapabilities))
                 }
             }
 
@@ -233,7 +243,7 @@ object ProxyUtil {
         return try {
             val hints = HashMap<EncodeHintType, Any>()
             hints[EncodeHintType.ERROR_CORRECTION] = ErrorCorrectionLevel.M
-            QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, size, size, hints, null, null, icon)
+            TelegramQRCodeWriter().encode(text, BarcodeFormat.QR_CODE, size, size, hints, null, null, icon)
         } catch (e: WriterException) {
             FileLog.e(e)
             createBitmap(size, size)

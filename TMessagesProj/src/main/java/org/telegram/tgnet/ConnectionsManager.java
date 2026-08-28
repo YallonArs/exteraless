@@ -18,6 +18,12 @@ import app.exteraless.feed.FeedRequestNormalizer;
 
 import com.google.android.exoplayer2.upstream.DefaultBandwidthMeter;
 
+// import com.google.android.gms.tasks.Task;
+// import com.google.android.play.core.integrity.IntegrityManager;
+// import com.google.android.play.core.integrity.IntegrityManagerFactory;
+// import com.google.android.play.core.integrity.IntegrityTokenRequest;
+// import com.google.android.play.core.integrity.IntegrityTokenResponse;
+
 import com.radolyn.ayugram.utils.AyuGhostUtils;
 
 import org.json.JSONArray;
@@ -293,12 +299,20 @@ public class ConnectionsManager extends BaseController {
     }
 
     public boolean isPushConnectionEnabled() {
-        SharedPreferences preferences = MessagesController.getGlobalNotificationsSettings();
+        // Переключатель в настройках уведомлений пишет в хранилище аккаунта
+        // (NotificationsSettingsActivity), а читалось глобальное — значение
+        // не находилось никогда, и постоянное подключение оставалось выключенным
+        // независимо от переключателя. Глобальное остаётся запасным: у ставивших
+        // сборку раньше значение лежит там.
+        SharedPreferences preferences = MessagesController.getNotificationsSettings(currentAccount);
         if (preferences.contains("pushConnection")) {
             return preferences.getBoolean("pushConnection", true);
-        } else {
-            return MessagesController.getMainSettings(UserConfig.selectedAccount).getBoolean("backgroundConnection", false);
         }
+        preferences = MessagesController.getGlobalNotificationsSettings();
+        if (preferences.contains("pushConnection")) {
+            return preferences.getBoolean("pushConnection", true);
+        }
+        return MessagesController.getMainSettings(UserConfig.selectedAccount).getBoolean("backgroundConnection", false);
     }
 
     public long getCurrentTimeMillis() {
@@ -665,7 +679,23 @@ public class ConnectionsManager extends BaseController {
         native_setNetworkAvailable(currentAccount, ApplicationLoader.isNetworkOnline(), ApplicationLoader.getCurrentNetworkType(), ApplicationLoader.isConnectionSlow());
     }
 
+    /**
+     * Состояние push-соединения на нативной стороне.
+     *
+     * Нужно, чтобы не дёргать её повторно тем же значением: обновление конфига
+     * с сервера (MessagesController.updateConfig) применяет флаг на каждом
+     * изменении keepAliveService, а экран уведомлений — на каждом нажатии.
+     * Каждый такой вызов пересобирает соединение, и резолв хоста прилетает в
+     * Java уже посреди разборки — на Pixel это кончалось SIGSEGV в
+     * getHostByName.
+     */
+    private Boolean pushConnectionEnabled;
+
     public void setPushConnectionEnabled(boolean value) {
+        if (pushConnectionEnabled != null && pushConnectionEnabled == value) {
+            return;
+        }
+        pushConnectionEnabled = value;
         native_setPushConnectionEnabled(currentAccount, value);
     }
 
@@ -710,6 +740,7 @@ public class ConnectionsManager extends BaseController {
             packageId = "";
         }
 
+        pushConnectionEnabled = enablePushConnection;
         native_init(currentAccount, version, layer, apiId, deviceModel, systemVersion, appVersion, langCode, systemLangCode, configPath, logPath, regId, cFingerprint, installer, packageId, timezoneOffset, userId, userPremium, enablePushConnection, ApplicationLoader.isNetworkOnline(), ApplicationLoader.getCurrentNetworkType(), SharedConfig.measureDevicePerformanceClass());
         checkConnection();
     }
@@ -926,21 +957,13 @@ public class ConnectionsManager extends BaseController {
                     task.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, null, null, null);
                     FileLog.d("9. currentTask = mozilla");
                     currentTask = task;
-                } else if (second == 1) {
+                } else {
                     if (BuildVars.LOGS_ENABLED) {
                         FileLog.d("start google txt task");
                     }
                     GoogleDnsLoadTask task = new GoogleDnsLoadTask(currentAccount);
                     task.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, null, null, null);
                     FileLog.d("11. currentTask = dnstxt");
-                    currentTask = task;
-                } else {
-                    if (BuildVars.LOGS_ENABLED) {
-                        FileLog.d("start firebase task");
-                    }
-                    FirebaseTask task = new FirebaseTask(currentAccount);
-                    task.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, null, null, null);
-                    FileLog.d("12. currentTask = firebase");
                     currentTask = task;
                 }
             });
@@ -1531,52 +1554,6 @@ public class ConnectionsManager extends BaseController {
                     }
                 }
             });
-        }
-    }
-
-    private static class FirebaseTask extends AsyncTask<Void, Void, NativeByteBuffer> {
-
-        private int currentAccount;
-
-        public FirebaseTask(int instance) {
-            super();
-            currentAccount = instance;
-        }
-
-        protected NativeByteBuffer doInBackground(Void... voids) {
-            try {
-                if (native_isTestBackend(currentAccount) != 0) {
-                    throw new Exception("test backend");
-                }
-                Utilities.stageQueue.postRunnable(() -> {
-                    if (BuildVars.LOGS_ENABLED) {
-                        FileLog.d("failed to get firebase result 2");
-                        FileLog.d("start dns txt task");
-                    }
-                    GoogleDnsLoadTask task = new GoogleDnsLoadTask(currentAccount);
-                    task.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, null, null, null);
-                    FileLog.d("7. currentTask = GoogleDnsLoadTask");
-                    currentTask = task;
-                });
-            } catch (Throwable e) {
-                Utilities.stageQueue.postRunnable(() -> {
-                    if (BuildVars.LOGS_ENABLED) {
-                        FileLog.d("failed to get firebase result");
-                        FileLog.d("start dns txt task");
-                    }
-                    GoogleDnsLoadTask task = new GoogleDnsLoadTask(currentAccount);
-                    task.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, null, null, null);
-                    FileLog.d("8. currentTask = GoogleDnsLoadTask");
-                    currentTask = task;
-                });
-                FileLog.e(e, false);
-            }
-            return null;
-        }
-
-        @Override
-        protected void onPostExecute(NativeByteBuffer result) {
-
         }
     }
 

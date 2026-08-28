@@ -333,6 +333,9 @@ public final class EtgBackup {
         bool(list, "newLoadingStyle", AppearanceConfig.newLoadingStyle);
         bool(list, "newChatHeaderStyle", AppearanceConfig.newChatHeaderStyle);
         bool(list, "newNavigationBarStyle", AppearanceConfig.newNavigationBarStyle);
+        bool(list, "iosNavigationBarStyle", AppearanceConfig.iosNavigationBarStyle);
+        bool(list, "iosFirstFolderOnTabTap", AppearanceConfig.iosFirstFolderOnTabTap);
+        bool(list, "iosBackCounter", AppearanceConfig.iosBackCounter);
         bool(list, "useSystemFonts", NekoConfig.typeface);
         bool(list, "gooeyAvatarAnimation", AppearanceConfig.gooeyAvatarAnimation);
         bool(list, "customThemes", AppearanceConfig.customThemes);
@@ -352,9 +355,11 @@ public final class EtgBackup {
         bool(list, "addCommaAfterMention", OpenExteraConfig.addCommaAfterMention);
         bool(list, "hideSendAsPeer", NekoConfig.hideSendAsChannel);
         bool(list, "removeMessageTail", ChatsConfig.removeMessageTail);
-        bool(list, "replaceEditedWithIcon", ChatsConfig.replaceEditedWithIcon);
+        bool(list, "replaceEditedWithIcon", NaConfig.INSTANCE.getUseEditedIcon());
         bool(list, "showOnlineStatus", NaConfig.INSTANCE.getShowOnlineStatus());
         bool(list, "hideShareButton", NaConfig.INSTANCE.getHideShareButtonInChannel());
+        bool(list, "wideChannelPosts", ChatsConfig.wideChannelPosts);
+        bool(list, "wideFeedPosts", ChatsConfig.wideFeedPosts);
         bool(list, "showResultsBeforeVoting", ChatsConfig.showResultsBeforeVoting);
         bool(list, "showCopyPhotoButton", NaConfig.INSTANCE.getShowCopyPhoto());
         bool(list, "showSaveMessageButton", NekoConfig.showAddToSavedMessages);
@@ -381,10 +386,17 @@ public final class EtgBackup {
         bool(list, "useSystemIconShape", IconPacksConfig.useSystemIconShape);
         bool(list, "infiniteScrolling", PillStackConfig.infiniteScrolling);
 
+        bool(list, "useGoogleCrashlytics", GeneralConfig.crashReports);
+
         // Инверсия: у exteraGram тумблер «включено», у NagramX — «выключено».
         boolInverted(list, "inAppVibration", NekoConfig.disableVibration);
-        boolInverted(list, "tabCounter", NaConfig.INSTANCE.getIgnoreUnreadCount());
-        boolInverted(list, "useGoogleCrashlytics", NaConfig.INSTANCE.getDisableCrashlyticsCollection());
+
+        list.add(new Entry(SECTION_EXTERA, "tabCounter", KIND_BOOL, 0, 0, null,
+                () -> new JsonPrimitive(NaConfig.INSTANCE.getIgnoreUnreadCount().Int()
+                        != NekoConfig.DIALOG_FILTER_EXCLUDE_ALL),
+                value -> NaConfig.INSTANCE.getIgnoreUnreadCount().setConfigInt(value.getAsBoolean()
+                        ? NekoConfig.DIALOG_FILTER_EXCLUDE_NONE
+                        : NekoConfig.DIALOG_FILTER_EXCLUDE_ALL)));
 
         integer(list, "titleText", AppearanceConfig.titleText, 0, 3);
         integer(list, "downloadSpeedBoost", GeneralConfig.downloadSpeedBoost, 0, 2);
@@ -492,14 +504,9 @@ public final class EtgBackup {
 
         // Безлимит недавних стикеров — один тумблер поверх двух ключей NagramX.
         list.add(new Entry(SECTION_EXTERA, "unlimitedRecentStickers", KIND_BOOL, 0, 0, null,
-                () -> new JsonPrimitive(NekoConfig.maxRecentStickerCount.Int() > RECENT_STICKERS_DEFAULT
-                        || NekoConfig.unlimitedFavedStickers.Bool()),
-                value -> {
-                    boolean enabled = value.getAsBoolean();
-                    NekoConfig.maxRecentStickerCount.setConfigInt(
-                            enabled ? RECENT_STICKERS_MAX : RECENT_STICKERS_DEFAULT);
-                    NekoConfig.unlimitedFavedStickers.setConfigBool(enabled);
-                }));
+                () -> new JsonPrimitive(NekoConfig.maxRecentStickerCount.Int() > RECENT_STICKERS_DEFAULT),
+                value -> NekoConfig.maxRecentStickerCount.setConfigInt(
+                        value.getAsBoolean() ? RECENT_STICKERS_MAX : RECENT_STICKERS_DEFAULT)));
 
         // Быстрые действия администратора — поверх пяти пунктов меню чата и пункта меню сообщения.
         list.add(new Entry(SECTION_EXTERA, "quickAdminShortcuts", KIND_BOOL, 0, 0, null,

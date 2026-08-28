@@ -53,7 +53,7 @@ final class HookFilter {
     private Integer index;
     private Object value;                    // "value": JSON-литерал -> Java-объект
     private String className;                // "class" для *_is_instance_of
-    private String expr;                     // "expr" для condition (MVEL)
+    private String expr;                     // "expression" (или "expr") для condition (MVEL)
     private Map<String, Object> objectVars;  // "object" -> переменные для MVEL
     private List<HookFilter> orFilters;      // "filters" для or
     private boolean valid = true;            // false — фильтр заведомо сломан, никогда не проходит
@@ -105,7 +105,9 @@ final class HookFilter {
         if (json.has("class")) {
             f.className = app.exteraless.plugins.JsonUtils.optStringOrNull(json, "class");
         }
-        if (json.has("expr")) {
+        if (json.has("expression")) {
+            f.expr = app.exteraless.plugins.JsonUtils.optStringOrNull(json, "expression");
+        } else if (json.has("expr")) {
             f.expr = app.exteraless.plugins.JsonUtils.optStringOrNull(json, "expr");
         }
         JSONObject object = json.optJSONObject("object");

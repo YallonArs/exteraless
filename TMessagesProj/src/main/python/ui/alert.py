@@ -91,7 +91,8 @@ class AlertDialogBuilder:
     BUTTON_NEGATIVE = -2
     BUTTON_NEUTRAL = -3
 
-    def __init__(self, context=None, alert_type=ALERT_TYPE_MESSAGE):
+    def __init__(self, context=None, alert_type=ALERT_TYPE_MESSAGE,
+                 resources_provider=None):
         if context is None:
             context = _default_context()
         self._alert_type = alert_type
@@ -102,9 +103,15 @@ class AlertDialogBuilder:
 
         Builder = _jclass("org.telegram.ui.ActionBar.AlertDialog$Builder")
         if int(alert_type) == self.ALERT_TYPE_MESSAGE:
-            self._builder = _run_sync(lambda: Builder(context))
-        else:
+            if resources_provider is None:
+                self._builder = _run_sync(lambda: Builder(context))
+            else:
+                self._builder = _run_sync(lambda: Builder(context, resources_provider))
+        elif resources_provider is None:
             self._builder = _run_sync(lambda: Builder(context, int(alert_type)))
+        else:
+            self._builder = _run_sync(
+                lambda: Builder(context, int(alert_type), resources_provider))
 
     # ---- content ----
 

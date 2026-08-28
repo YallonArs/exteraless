@@ -22,6 +22,7 @@ import app.exteraless.components.ReceiveContentEditText;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.FileLog;
+import org.telegram.messenger.R;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.spoilers.SpoilerEffect;
 import org.telegram.ui.Components.spoilers.SpoilersClickDetector;
@@ -71,7 +72,7 @@ public class EditTextEffects extends ReceiveContentEditText {
     private boolean clipToPadding;
 
     public EditTextEffects(Context context) {
-        super(context);
+        super(context, null, 0, R.style.EditTextNoBackgroundStyle);
 
         if (Looper.getMainLooper().getThread() == Thread.currentThread()) {
             clickDetector = new SpoilersClickDetector(this, spoilers, this::onSpoilerClicked);

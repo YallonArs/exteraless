@@ -382,7 +382,6 @@ public class NotificationCenter {
 
     // custom
     public static final int updateLoginToken = totalEvents++;
-    public static final int accountLogin = totalEvents++;
 
     // exteraless plugins
     /** Плагин завис или отвис: слушатели перерисовывают его строку. */
@@ -391,6 +390,10 @@ public class NotificationCenter {
     public static final int pluginMenuItemsUpdated = totalEvents++;
     /** Состав плагинов изменился; имя из exteraGram — на него ссылаются dex-модули. */
     public static final int pluginsUpdated = totalEvents++;
+
+    public static final int pluginSettingsRegistered = totalEvents++;
+
+    public static final int pluginSettingsUnregistered = totalEvents++;
 
     public static final int feedNeedReload = totalEvents++;
     public static final int feedTabVisibleToggled = totalEvents++;

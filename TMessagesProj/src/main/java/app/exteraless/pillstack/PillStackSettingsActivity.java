@@ -70,6 +70,21 @@ public class PillStackSettingsActivity extends BaseNekoSettingsActivity {
     }
 
     @Override
+    public int getSearchGuid() {
+        return 25000;
+    }
+
+    @Override
+    public int getSearchIcon() {
+        return R.drawable.msg_pin;
+    }
+
+    @Override
+    public String getSearchPrefix() {
+        return "PillStack";
+    }
+
+    @Override
     protected String getKey() {
         return "pillstack";
     }

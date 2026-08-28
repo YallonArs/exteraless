@@ -44,6 +44,7 @@ import java.util.List;
 import app.exteraless.plugins.Plugin;
 import app.exteraless.plugins.PluginPermissions;
 import app.exteraless.plugins.PluginsController;
+import app.exteraless.plugins.PluginsWatchdog;
 import com.exteragram.messenger.preferences.BasePreferencesActivity;
 
 /**
@@ -65,6 +66,7 @@ public class PluginSettingsActivity extends BasePreferencesActivity {
     private static final int ID_PERMISSIONS = -1;
     private static final int ID_NOT_LOADED = -2;
     private static final int ID_PERMISSIONS_SHADOW = -3;
+    private static final int ID_WATCHDOG_WARNINGS = -4;
 
     static {
         UItem.UItemFactory.setup(new PluginCustomRowFactory());
@@ -79,7 +81,10 @@ public class PluginSettingsActivity extends BasePreferencesActivity {
      */
     private Plugin plugin;
 
+    private String targetSetting;
+
     private String subPageJson;
+    private Object createSubFragmentCallback;
     private String subPageTitle;
     private int[] subPageIndex;
     private String[] subPageOwners;
@@ -101,9 +106,20 @@ public class PluginSettingsActivity extends BasePreferencesActivity {
         this.plugin = plugin;
     }
 
+    public PluginSettingsActivity(Plugin plugin, String targetSetting) {
+        this(plugin);
+        this.targetSetting = targetSetting;
+    }
+
     public static PluginSettingsActivity newInstance(String pluginId) {
         PluginSettingsActivity fragment = new PluginSettingsActivity();
         fragment.pluginId = pluginId;
+        return fragment;
+    }
+
+    public static PluginSettingsActivity newInstance(String pluginId, String targetSetting) {
+        PluginSettingsActivity fragment = newInstance(pluginId);
+        fragment.targetSetting = targetSetting;
         return fragment;
     }
 
@@ -112,6 +128,7 @@ public class PluginSettingsActivity extends BasePreferencesActivity {
         PluginSettingsActivity fragment = new PluginSettingsActivity();
         fragment.pluginId = pluginId;
         fragment.subPageJson = json;
+        fragment.createSubFragmentCallback = json;
         fragment.subPageTitle = title;
         fragment.subPageIndex = index;
         fragment.subPageOwners = owners;
@@ -285,6 +302,25 @@ public class PluginSettingsActivity extends BasePreferencesActivity {
             FileLog.e("PluginSettingsActivity: fillItems failed for " + pluginId, t);
         }
         appendPermissionsRow(items);
+        if (targetSetting != null) {
+            AndroidUtilities.runOnUIThread(this::scrollToTargetSetting);
+        }
+    }
+
+    private void scrollToTargetSetting() {
+        if (targetSetting == null || listView == null || listView.adapter == null
+                || layoutManager == null) {
+            return;
+        }
+        final int id = targetSetting.hashCode() & 0x7FFFFFFF;
+        for (int i = 0; i < listView.adapter.getItemCount(); i++) {
+            UItem item = listView.adapter.getItem(i);
+            if (item != null && item.id == id) {
+                layoutManager.scrollToPositionWithOffset(i, AndroidUtilities.dp(48));
+                targetSetting = null;
+                return;
+            }
+        }
     }
 
     /**
@@ -325,6 +361,9 @@ public class PluginSettingsActivity extends BasePreferencesActivity {
                 applyTextCellGeometry((TextCell) view, null);
             }
         }));
+        items.add(UItem.asCheck(ID_WATCHDOG_WARNINGS, getString(R.string.PluginWatchdogWarnings))
+                .setChecked(!PluginsController.getInstance().getWatchdog().isWarningMuted(pluginId)));
+        items.add(UItem.asShadow(-5, getString(R.string.PluginWatchdogWarningsInfo)));
     }
 
     private static boolean endsWithShadow(ArrayList<UItem> items) {
@@ -518,7 +557,7 @@ public class PluginSettingsActivity extends BasePreferencesActivity {
     /** Строка-текст: selector, input, edittext и просто text. */
     private UItem textRow(JSONObject row, int id, String type) {
         final boolean isText = "text".equals(type);
-        final String subtext = isText ? optNonEmpty(row, "subtext") : null;
+        final String subtext = optNonEmpty(row, "subtext");
         final String value = isText ? null : rowValue(row);
         UItem item = UItem.asButton(id, resolveIcon(row), rowTitle(row), value);
         item.red = row.optBoolean("red");
@@ -635,9 +674,17 @@ public class PluginSettingsActivity extends BasePreferencesActivity {
     private static String rowValue(JSONObject item) {
         if ("selector".equals(item.optString("type"))) {
             JSONArray options = item.optJSONArray("items");
+            if (options == null || options.length() == 0) {
+                return "";
+            }
             int selected = item.optInt("value");
-            return options != null && selected >= 0 && selected < options.length()
-                    ? options.optString(selected) : "";
+            if (selected < 0 || selected >= options.length()) {
+                selected = item.optInt("default", 0);
+            }
+            if (selected < 0 || selected >= options.length()) {
+                selected = 0;
+            }
+            return options.optString(selected);
         }
         return item.optString("value");
     }
@@ -669,6 +716,16 @@ public class PluginSettingsActivity extends BasePreferencesActivity {
     public void onClick(UItem item, View view, int position, float x, float y) {
         if (item != null && item.id == ID_PERMISSIONS && rowOf(item) == null) {
             presentFragment(new PluginPermissionsActivity(pluginId));
+            return;
+        }
+        if (item != null && item.id == ID_WATCHDOG_WARNINGS && rowOf(item) == null) {
+            PluginsWatchdog watchdog = PluginsController.getInstance().getWatchdog();
+            boolean warn = watchdog.isWarningMuted(pluginId);
+            watchdog.setWarningMuted(pluginId, !warn);
+            item.checked = warn;
+            if (view instanceof TextCheckCell) {
+                ((TextCheckCell) view).setChecked(warn);
+            }
             return;
         }
         JSONObject row = rowOf(item);

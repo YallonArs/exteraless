@@ -21,6 +21,7 @@
 
 import ast
 import re
+import zipfile
 from typing import Dict, List
 
 PERM_MESSAGES_READ = "messages.read"
@@ -99,32 +100,160 @@ _MARKERS = (
     (".so'", PERM_NATIVE, "native library"),
 )
 
+KEY_OBFUSCATION = "obfuscation"
+
+#: Упаковщики, которые подписываются сами.
+_OBF_PACKERS = (
+    ("__pyarmor__", "pyarmor"),
+    ("pytransform", "pyarmor"),
+    ("pyarmor_runtime", "pyarmor"),
+    ("PYARMOR", "pyarmor"),
+    ("pyminifier", "pyminifier"),
+    ("Sourcedefender", "sourcedefender"),
+    ("sourcedefender", "sourcedefender"),
+)
+
+#: Распаковщики: сами по себе законны, уликой становятся в паре с exec/eval.
+_OBF_DECODERS = (
+    ("marshal.loads(", "marshal"),
+    ("zlib.decompress(", "zlib"),
+    ("lzma.decompress(", "lzma"),
+    ("bz2.decompress(", "bz2"),
+    ("b64decode(", "base64"),
+    ("b85decode(", "base85"),
+    ("a85decode(", "base85"),
+    ("b32decode(", "base32"),
+    ("b16decode(", "base16"),
+    ("unhexlify(", "unhexlify"),
+    ("codecs.decode(", "codecs"),
+)
+
+#: Вызов exec/eval/compile, а не re.compile и не чужой метод .exec().
+_OBF_EXEC = re.compile(r"(?<![\w.])(?:exec|eval|compile)\s*\(")
+
+#: Имена вида _lt6i9dini5txqwg60v06rmg44mp6x5tv: подчёркивание, буква-другая и
+#: длинный хвост из строчных букв и цифр. Человек так переменные не называет.
+_OBF_NAME = re.compile(r"\b_[A-Za-z]{0,2}[0-9a-z]{16,}\b")
+
+_OBF_HEX = re.compile(r"\\x[0-9a-fA-F]{2}")
+
+#: Столько разных нечитаемых имён считаем перезаписью всего файла, а не
+#: одним неудачно названным полем.
+_OBF_NAME_LIMIT = 8
+
+#: Длина строки, после которой исходник перестаёт быть читаемым глазами.
+_OBF_LINE_LIMIT = 2000
+
+_OBF_HEX_LIMIT = 50
+
+
+def _detect_obfuscation(source: str) -> List[str]:
+    """Улики того, что исходник намеренно сделан нечитаемым.
+
+    Разбор возможностей выше опирается на то, что в тексте видны настоящие
+    имена. Обфускация ровно это и ломает: `ctypes` превращается в
+    `_lui3h1my3nt73zqovaek04oy4snpuk`, ни один маркер не совпадает, и диалог
+    установки честно показывает пустой список. Поэтому нечитаемость — сама по
+    себе улика, и человеку её нужно назвать.
+    """
+    strong: List[str] = []
+    weak: List[str] = []
+
+    def note(bucket: List[str], name: str) -> None:
+        if name not in bucket:
+            bucket.append(name)
+
+    for marker, evidence in _OBF_PACKERS:
+        if marker in source:
+            note(strong, evidence)
+
+    if _OBF_EXEC.search(source):
+        for marker, evidence in _OBF_DECODERS:
+            if marker in source:
+                note(strong, "exec+" + evidence)
+
+    names = set(_OBF_NAME.findall(source))
+    if len(names) >= _OBF_NAME_LIMIT:
+        note(strong, "mangled names")
+
+    lines = source.splitlines() or [""]
+    if max(len(line) for line in lines) >= _OBF_LINE_LIMIT:
+        note(weak, "long lines")
+
+    if len(_OBF_HEX.findall(source)) >= _OBF_HEX_LIMIT:
+        note(weak, "escaped strings")
+
+    if strong:
+        return strong + weak
+    if len(weak) >= 2:
+        return weak
+    return []
+
+
 #: Файл больше этого не разбираем: плагины такого размера не встречаются,
 #: а на упавшем установщике польза от разбора отрицательная.
 _MAX_SOURCE_BYTES = 1 * 1024 * 1024 * 1024  # = 1 MB
 
 
+_MAX_ARCHIVE_BYTES = 16 * 1024 * 1024
+
+_SOURCE_MEMBER_SUFFIXES = (".py", ".pyc")
+
+
+def _merge(target: Dict[str, List[str]], addition: Dict[str, List[str]]) -> None:
+    for permission, evidence in addition.items():
+        bucket = target.setdefault(permission, [])
+        for item in evidence:
+            if item not in bucket:
+                bucket.append(item)
+
+
+def _scan_source(source: str) -> Dict[str, List[str]]:
+    found: Dict[str, List[str]] = {}
+    for marker, permission, evidence in _MARKERS:
+        if marker in source and evidence not in found.setdefault(permission, []):
+            found[permission].append(evidence)
+
+    _merge(found, _scan_imports(source))
+
+    obfuscation = _detect_obfuscation(source)
+    if obfuscation:
+        found[KEY_OBFUSCATION] = obfuscation
+
+    return {perm: names for perm, names in found.items() if names}
+
+
+def _scan_archive(path: str) -> Dict[str, List[str]]:
+    found: Dict[str, List[str]] = {}
+    budget = _MAX_ARCHIVE_BYTES
+    with zipfile.ZipFile(path) as archive:
+        for info in archive.infolist():
+            if budget <= 0:
+                break
+            if info.is_dir() or not info.filename.endswith(_SOURCE_MEMBER_SUFFIXES):
+                continue
+            try:
+                with archive.open(info) as handle:
+                    raw = handle.read(min(_MAX_SOURCE_BYTES, budget))
+            except Exception:
+                continue
+            budget -= len(raw)
+            _merge(found, _scan_source(raw.decode("utf-8", errors="replace")))
+    return {perm: names for perm, names in found.items() if names}
+
+
 def scan(path: str) -> Dict[str, List[str]]:
     """{разрешение: [улики]} — что плагин по исходнику может делать."""
     try:
+        if zipfile.is_zipfile(path):
+            return _scan_archive(path)
         with open(path, "rb") as handle:
             raw = handle.read(_MAX_SOURCE_BYTES)
         source = raw.decode("utf-8", errors="replace")
     except Exception:
         return {}
 
-    found: Dict[str, List[str]] = {}
-    for marker, permission, evidence in _MARKERS:
-        if marker in source and evidence not in found.setdefault(permission, []):
-            found[permission].append(evidence)
-
-    for permission, evidence in _scan_imports(source).items():
-        target = found.setdefault(permission, [])
-        for item in evidence:
-            if item not in target:
-                target.append(item)
-
-    return {perm: names for perm, names in found.items() if names}
+    return _scan_source(source)
 
 
 #: Что именно импортируют из пакетов мессенджера. Пакет целиком ни о чём не
@@ -148,6 +277,35 @@ _IMPORTED_NAMES = {
 }
 
 
+_IMPORTED_MODULES = {
+    "ctypes": (PERM_NATIVE, "ctypes"),
+    "requests": (PERM_NETWORK, "requests"),
+    "httpx": (PERM_NETWORK, "httpx"),
+    "aiohttp": (PERM_NETWORK, "aiohttp"),
+    "urllib": (PERM_NETWORK, "urllib"),
+    "urllib3": (PERM_NETWORK, "urllib"),
+    "http": (PERM_NETWORK, "http.client"),
+    "socket": (PERM_NETWORK, "socket"),
+    "socketserver": (PERM_NETWORK, "socket"),
+    "ftplib": (PERM_NETWORK, "ftplib"),
+    "smtplib": (PERM_NETWORK, "smtplib"),
+    "telnetlib": (PERM_NETWORK, "telnetlib"),
+    "websocket": (PERM_NETWORK, "websocket"),
+    "websockets": (PERM_NETWORK, "websocket"),
+    "subprocess": (PERM_NATIVE, "subprocess"),
+}
+
+
+def _note_module(result: Dict[str, List[str]], name: str) -> None:
+    rule = _IMPORTED_MODULES.get(name.partition(".")[0])
+    if rule is None:
+        return
+    permission, evidence = rule
+    bucket = result.setdefault(permission, [])
+    if evidence not in bucket:
+        bucket.append(evidence)
+
+
 def _scan_imports(source: str) -> Dict[str, List[str]]:
     """Импорты: важно не откуда, а что именно."""
     result: Dict[str, List[str]] = {}
@@ -156,17 +314,25 @@ def _scan_imports(source: str) -> Dict[str, List[str]]:
     except Exception:
         # Битый Python разберём регулярным выражением: диалог установки всё
         # равно должен что-то показать.
-        for names in re.findall(r"^\s*from\s+[A-Za-z0-9_.]+\s+import\s+([^\n#]+)", source, re.M):
+        for module, names in re.findall(
+                r"^\s*from\s+([A-Za-z0-9_.]+)\s+import\s+([^\n#]+)", source, re.M):
+            _note_module(result, module)
             for name in names.split(","):
                 _note_name(result, name.strip().split(" as ")[0])
+        for names in re.findall(r"^\s*import\s+([^\n#]+)", source, re.M):
+            for name in names.split(","):
+                _note_module(result, name.strip().split(" as ")[0])
         return result
 
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom):
+            if node.module:
+                _note_module(result, node.module)
             for alias in node.names:
                 _note_name(result, alias.name)
         elif isinstance(node, ast.Import):
             for alias in node.names:
+                _note_module(result, alias.name)
                 _note_name(result, alias.name.rpartition(".")[2])
     return result
 

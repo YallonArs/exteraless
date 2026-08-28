@@ -31,6 +31,9 @@ public final class PluginCapabilityScan {
 
     private static final String PREFIX = "plugin_scan_";
 
+    /** Ключ разбора, который не является разрешением: код плагина нечитаем. */
+    public static final String KEY_OBFUSCATION = "obfuscation";
+
     private PluginCapabilityScan() {
     }
 
@@ -59,7 +62,7 @@ public final class PluginCapabilityScan {
             JSONObject parsed = new JSONObject(json);
             for (Iterator<String> keys = parsed.keys(); keys.hasNext(); ) {
                 String key = keys.next();
-                if (!PluginPermissions.isKnown(key)) {
+                if (!PluginPermissions.isKnown(key) && !KEY_OBFUSCATION.equals(key)) {
                     continue;  // "error" и всё незнакомое
                 }
                 JSONArray array = parsed.optJSONArray(key);
@@ -135,6 +138,15 @@ public final class PluginCapabilityScan {
                 org.telegram.messenger.AndroidUtilities.runOnUIThread(onReady);
             }
         });
+    }
+
+    /** Улики нечитаемости кода; пустой список, если разбор ничего не нашёл. */
+    public static List<String> obfuscationEvidence(Map<String, List<String>> capabilities) {
+        return evidenceOf(capabilities, KEY_OBFUSCATION);
+    }
+
+    public static boolean isObfuscated(Map<String, List<String>> capabilities) {
+        return !obfuscationEvidence(capabilities).isEmpty();
     }
 
     /** Улики одного разрешения; пустой список, если разбора нет. */

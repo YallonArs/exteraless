@@ -629,17 +629,17 @@ class BasePlugin:
 
     # ---- menus ----
 
-    def add_menu_item(self, data: MenuItemData) -> Optional[str]:
+    def add_menu_item(self, menu_item_data: MenuItemData) -> Optional[str]:
         """Register a menu item; returns its item_id."""
-        if not isinstance(data, MenuItemData):
+        if not isinstance(menu_item_data, MenuItemData):
             raise TypeError("add_menu_item() expects a MenuItemData instance")
         payload = {
-            "menu_type": str(data.menu_type),
-            "text": str(data.text),
-            "priority": int(data.priority),
+            "menu_type": str(menu_item_data.menu_type),
+            "text": str(menu_item_data.text),
+            "priority": int(menu_item_data.priority),
         }
         for key in ("item_id", "icon", "subtext", "condition"):
-            value = getattr(data, key)
+            value = getattr(menu_item_data, key)
             if value is not None:
                 payload[key] = value
         if self._bridge_available():
@@ -648,15 +648,15 @@ class BasePlugin:
                 # directly with a java.util.Map context on menu clicks.
                 item_id = PythonBridge.addMenuItem(self._plugin_id,
                                                    json.dumps(payload, ensure_ascii=False),
-                                                   data.on_click)
+                                                   menu_item_data.on_click)
             except Exception as e:
-                self.log(f"add_menu_item({data.text!r}) failed: {e}")
+                self.log(f"add_menu_item({menu_item_data.text!r}) failed: {e}")
                 return None
         else:
             # Host fallback: deterministic local id so callbacks remain testable.
-            item_id = data.item_id or f"local_{abs(hash((data.menu_type, data.text))) & 0xFFFFFFFF:08x}"
-        if data.on_click is not None and item_id:
-            self._state("_menu_callbacks", dict)[item_id] = data.on_click
+            item_id = menu_item_data.item_id or f"local_{abs(hash((menu_item_data.menu_type, menu_item_data.text))) & 0xFFFFFFFF:08x}"
+        if menu_item_data.on_click is not None and item_id:
+            self._state("_menu_callbacks", dict)[item_id] = menu_item_data.on_click
         return item_id
 
     def remove_menu_item(self, item_id: str):

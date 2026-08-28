@@ -118,6 +118,10 @@ object ChatsConfig {
     @JvmStatic
     fun flashIntensity(): Float = flashIntensity.Int() / 100f
 
+    /** Скрепка при наборе остаётся скрепкой, а не «тремя точками» с меню. */
+    @JvmField
+    val keepAttachButton = addConfig("OEChatsKeepAttachButton", ConfigItem.configTypeBool, false)
+
     /** Скрыть плитку камеры в шторке вложений. */
     @JvmField
     val hideCameraTile = addConfig("OEChatsHideCameraTile", ConfigItem.configTypeBool, false)
@@ -143,6 +147,12 @@ object ChatsConfig {
     // ---- Чаты ----
 
     // ---- Сообщения ----
+
+    @JvmField
+    val wideChannelPosts = addConfig("OEChatsWideChannelPosts", ConfigItem.configTypeBool, false)
+
+    @JvmField
+    val wideFeedPosts = addConfig("OEChatsWideFeedPosts", ConfigItem.configTypeBool, false)
 
     /** Убрать «хвостик» пузыря (только UI). */
     @JvmField
@@ -234,6 +244,18 @@ object ChatsConfig {
     fun stickerShape(): Int {
         ensureLoaded()
         return stickerShape.Int()
+    }
+
+    @JvmStatic
+    fun wideChannelPosts(): Boolean {
+        ensureLoaded()
+        return wideChannelPosts.Bool()
+    }
+
+    @JvmStatic
+    fun wideFeedPosts(): Boolean {
+        ensureLoaded()
+        return wideFeedPosts.Bool()
     }
 
     @JvmStatic

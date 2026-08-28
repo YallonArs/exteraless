@@ -152,7 +152,7 @@ public class Plugin extends com.exteragram.messenger.plugins.Plugin {
     }
 
     public boolean isEnabled() {
-        return enabled;
+        return enabled && loadError == null;
     }
 
     public void setEnabled(boolean value) {

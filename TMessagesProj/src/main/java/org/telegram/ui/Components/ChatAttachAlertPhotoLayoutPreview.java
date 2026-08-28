@@ -57,10 +57,15 @@ import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.ActionBarMenu;
 import org.telegram.ui.ActionBar.ActionBarMenuItem;
 import org.telegram.ui.ActionBar.BaseFragment;
+import org.telegram.ui.ActionBar.MessageDrawable;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Cells.ChatActionCell;
 import org.telegram.ui.ChatActivity;
+import org.telegram.ui.Components.spoilers.SpoilerEffect;
 import org.telegram.ui.Components.spoilers.SpoilerEffect2;
+
+import android.graphics.Color;
+import androidx.core.graphics.ColorUtils;
 import org.telegram.ui.LaunchActivity;
 import org.telegram.ui.PhotoViewer;
 import org.telegram.ui.Stars.StarsIntroActivity;
@@ -1953,6 +1958,7 @@ public class ChatAttachAlertPhotoLayoutPreview extends ChatAttachAlert.AttachAle
                 private String videoDurationText = null;
 
                 private SpoilerEffect2 spoilerEffect;
+                private SpoilerEffect spoilerEffectFallback;
                 private Path path = new Path();
                 private float[] radii = new float[8];
 
@@ -2383,7 +2389,16 @@ public class ChatAttachAlertPhotoLayoutPreview extends ChatAttachAlert.AttachAle
                         if (spoilerEffect == null) {
                             spoilerEffect = SpoilerEffect2.getInstance(PreviewGroupsView.this);
                         }
-                        spoilerEffect.draw(canvas, PreviewGroupsView.this, getWidth(), getHeight());
+                        if (spoilerEffect != null) {
+                            spoilerEffect.draw(canvas, PreviewGroupsView.this, getWidth(), getHeight());
+                        } else {
+                            if (spoilerEffectFallback == null) {
+                                spoilerEffectFallback = new SpoilerEffect();
+                                spoilerEffectFallback.setColor(ColorUtils.setAlphaComponent(Color.WHITE, (int) (Color.alpha(Color.WHITE) * 0.325f)));
+                            }
+                            spoilerEffectFallback.setBounds(0, 0, getWidth(), getHeight());
+                            spoilerEffectFallback.draw(canvas);
+                        }
                         canvas.restore();
 
                         invalidate();
@@ -2532,8 +2547,8 @@ public class ChatAttachAlertPhotoLayoutPreview extends ChatAttachAlert.AttachAle
             private long buttonTextPrice;
             private final Paint buttonTextBgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
-            private final Theme.MessageDrawable messageBackground = (Theme.MessageDrawable) getThemedDrawable(Theme.key_drawable_msgOutMedia);
-            private final Theme.MessageDrawable.PathDrawParams backgroundCacheParams = new Theme.MessageDrawable.PathDrawParams();
+            private final MessageDrawable messageBackground = (MessageDrawable) getThemedDrawable(Theme.key_drawable_msgOutMedia);
+            private final MessageDrawable.PathDrawParams backgroundCacheParams = new MessageDrawable.PathDrawParams();
             public boolean draw(Canvas canvas) {
                 boolean update = false;
                 final float t = interpolator.getInterpolation(Math.min(1, (SystemClock.elapsedRealtime() - lastMediaUpdate) / (float) updateDuration));

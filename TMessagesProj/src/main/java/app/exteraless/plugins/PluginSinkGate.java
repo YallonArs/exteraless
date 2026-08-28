@@ -54,9 +54,16 @@ public final class PluginSinkGate {
      */
     private static final ThreadLocal<Boolean> INSIDE = new ThreadLocal<>();
 
-    /** Классы, недоступные плагину ни при каких разрешениях. */
+    /**
+     * Классы, недоступные плагину ни при каких разрешениях.
+     *
+     * {@code java.lang.Runtime} здесь не место: класс нужен и ради
+     * {@code exit}, {@code gc}, {@code availableProcessors}, а запрет на
+     * резолв ронял плагин на строке импорта, до всякого разрешения. Опасное в
+     * нём закрыто по методам: {@code exec} — hookDeny, {@code load0} и
+     * {@code loadLibrary0} — hookNativeLoad.
+     */
     private static final String[] DENIED_CLASSES = {
-            "java.lang.Runtime",
             "java.lang.ProcessBuilder",
             "java.lang.Process",
             "app.exteraless.plugins.PluginPermissions",
@@ -124,6 +131,7 @@ public final class PluginSinkGate {
         int ok = 0;
         ok += hookDeny(Runtime.class, "exec", "run a shell command", "process");
         ok += hookDeny(ProcessBuilder.class, "start", "start a process", "process");
+        ok += hookDeny(ProcessBuilder.class, "startPipeline", "start a process", "process");
         ok += hookNativeLoad();
         ok += hookNetwork(URL.class, "openConnection", "open a network connection");
         ok += hookNetwork(Socket.class, "connect", "connect to the network");
@@ -271,7 +279,14 @@ public final class PluginSinkGate {
                     return;
                 }
                 try {
-                    deny(pluginId, "Runtime." + param.method.getName(), "native", describe(param),
+                    String event = "Runtime." + param.method.getName();
+                    String reason = allowNativeLoadReason(param);
+                    if (reason != null) {
+                        PluginAuditJournal.record(pluginId, event, "native",
+                                describe(param) + " (" + reason + ")", true);
+                        return;
+                    }
+                    deny(pluginId, event, "native", describe(param),
                             "loading a native library is never available to plugins", param);
                 } finally {
                     leaveCheck();
@@ -281,6 +296,55 @@ public final class PluginSinkGate {
         int count = hookAll(Runtime.class, "load0", hook);
         count += hookAll(Runtime.class, "loadLibrary0", hook);
         return count;
+    }
+
+    /**
+     * Почему этот вызов {@code loadLibrary} не считается загрузкой плагина.
+     *
+     * Метка на потоке говорит лишь, что где-то ниже по стеку исполняется
+     * плагин, — а .so грузит не он. Плагин зовёт публичный API, тот уходит в
+     * платформу, и библиотеку тянет уже она. На vivo так падало приложение:
+     * плагин вызывал {@code CameraManager.getCameraIdList()},
+     * {@code VivoJavaJsonOperate.<clinit>} звал {@code System.loadLibrary},
+     * наш отказ прилетал исключением из статического инициализатора —
+     * и класс платформы оставался испорченным до конца жизни процесса.
+     * Следующий колбэк камеры получал {@code NoClassDefFoundError} на
+     * binder-потоке, где обработчика нет.
+     *
+     * Отсюда два послабления. Загрузчик boot — код платформы, плагину такой
+     * класс не принадлежит. Статический инициализатор — отказ там бьёт не по
+     * вызову, а по классу целиком, включая тех, кто плагина в глаза не видел.
+     *
+     * Собственная загрузка плагина под них не подходит: его классы приходят
+     * из своего загрузчика, а вызов идёт из обычного метода.
+     */
+    private static String allowNativeLoadReason(XC_MethodHook.MethodHookParam param) {
+        final Object[] args = param.args;
+        final Class<?>[] types = param.method instanceof Method
+                ? ((Method) param.method).getParameterTypes() : null;
+        if (args != null) {
+            for (int i = 0; i < args.length; i++) {
+                if (args[i] instanceof Class) {
+                    if (((Class<?>) args[i]).getClassLoader() == null) {
+                        return "platform class " + ((Class<?>) args[i]).getName();
+                    }
+                    break;
+                }
+                if (args[i] instanceof ClassLoader) {
+                    break;
+                }
+                if (args[i] == null && types != null && i < types.length
+                        && ClassLoader.class.isAssignableFrom(types[i])) {
+                    return "boot class loader";
+                }
+            }
+        }
+        for (StackTraceElement element : Thread.currentThread().getStackTrace()) {
+            if ("<clinit>".equals(element.getMethodName())) {
+                return "static initializer of " + element.getClassName();
+            }
+        }
+        return null;
     }
 
     /**
@@ -705,6 +769,10 @@ public final class PluginSinkGate {
      */
     private static void denySilently(String pluginId, String event, String category, String detail,
                                      String reason, XC_MethodHook.MethodHookParam param) {
+        if (PluginPermissions.isUnsafeMode()) {
+            PluginAuditJournal.record(pluginId, event, category, detail, true);
+            return;
+        }
         PluginAuditJournal.record(pluginId, event, category, detail, false);
         FileLog.w("PluginSinkGate: skipped " + event + " for plugin " + pluginId + " — " + reason);
         param.setResult(emptyResultFor(param));
@@ -739,6 +807,10 @@ public final class PluginSinkGate {
 
     private static void deny(String pluginId, String event, String category, String detail,
                              String reason, XC_MethodHook.MethodHookParam param) {
+        if (PluginPermissions.isUnsafeMode()) {
+            PluginAuditJournal.record(pluginId, event, category, detail, true);
+            return;
+        }
         PluginAuditJournal.record(pluginId, event, category, detail, false, callerStack());
         FileLog.w("PluginSinkGate: denied " + event + " to plugin " + pluginId + " — " + reason);
         param.setThrowable(denialFor(event, category, pluginId, reason));

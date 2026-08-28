@@ -97,6 +97,11 @@ public class ChatActivityFadeView extends View implements Theme.Colorable {
         fadeDrawableBottom.setBounds(0, getMeasuredHeight() - fadeZoneBottom, getMeasuredWidth(), getMeasuredHeight());
     }
 
+    public void setTopFadeColor(int color) {
+        fadeDrawableTop.setOverrideFadeColor(color);
+        invalidate();
+    }
+
     public void setIgnoreFastWay(boolean ignoreFastWay) {
         fadeDrawableTop.setIgnoreFastWay(ignoreFastWay);
         fadeDrawableBottom.setIgnoreFastWay(ignoreFastWay);

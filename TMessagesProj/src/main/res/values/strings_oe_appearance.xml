@@ -53,6 +53,7 @@
     <string name="OEAppearanceDisableAvatarBlur">Disable Avatar Blur</string>
     <string name="OEAppearanceBlurInfo">Blur effects will be applied to all themes, overriding their default settings.</string>
 
+    <string name="OEAppearanceRestartNow">Restart</string>
     <string name="OEAppearanceNeedRestart">Restart the app to apply this setting.</string>
 
     <!-- General / Sections / Blur extras (UI only) -->
@@ -111,6 +112,10 @@
     <string name="OEAppearanceNewLoadingStyle">Loading Style</string>
     <string name="OEAppearanceNewChatHeaderStyle">Chat Header</string>
     <string name="OEAppearanceNewNavigationBarStyle">Bottom Navigation Bar</string>
+    <string name="OEAppearanceIosDesign" translatable="false">iOS Design</string>
+    <string name="OEAppearanceIosNavigationBarStyle">Bottom Navigation Bar</string>
+    <string name="OEAppearanceIosBackCounter">Unread Count Next to Back</string>
+    <string name="OEAppearanceIosFirstFolderOnTabTap">Tab Tap Opens First Folder</string>
     <string name="OEAppearanceHideAi">Hide AI</string>
     <string name="OEAppearanceHideAiEditor">AI editor button</string>
     <string name="OEAppearanceHideAiSummary">Message summary button</string>
@@ -118,4 +123,7 @@
     <string name="MonetStyleHeader">Monet palette</string>
     <string name="MonetStyleTelemone">Telemone</string>
     <string name="MonetStyleClassic">Classic</string>
+    <string name="OEAppearanceTabCounterAll">All chats</string>
+    <string name="OEAppearanceTabCounterUnmuted">Except muted</string>
+    <string name="OEAppearanceTabCounterOff">Off</string>
 </resources>

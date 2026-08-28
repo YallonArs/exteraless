@@ -214,7 +214,7 @@ def _archive_string_lookup(zf: zipfile.ZipFile, refmap: Dict[str, str]):
     """A key lookup over the archive's localization files (current locale)."""
     from .localization import Strings, load_strings_from_zip
 
-    declared = refmap.get("strings")
+    declared = refmap.get("strings") or refmap.get("locales")
     if not declared:
         return None
     catalog = load_strings_from_zip(zf, declared.strip("/"))

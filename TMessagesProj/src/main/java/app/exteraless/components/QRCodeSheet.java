@@ -20,8 +20,9 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.google.zxing.EncodeHintType;
-import com.google.zxing.qrcode.QRCodeWriter;
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
+
+import org.telegram.messenger.TelegramQRCodeWriter;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.FileLog;
@@ -276,7 +277,7 @@ public class QRCodeSheet extends BottomSheet {
             HashMap<EncodeHintType, Object> hints = new HashMap<>();
             hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.M);
             hints.put(EncodeHintType.MARGIN, 0);
-            return new QRCodeWriter().encode(content, 768, 768, hints, null);
+            return new TelegramQRCodeWriter().encode(content, 768, 768, hints, null);
         } catch (Exception e) {
             FileLog.e(e);
             return null;

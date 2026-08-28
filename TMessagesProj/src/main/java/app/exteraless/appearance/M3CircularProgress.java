@@ -12,15 +12,15 @@ import org.telegram.messenger.AndroidUtilities;
  * Эмуляция Material 3 CircularProgressIndicator: дуга-индикатор, дорожка (track) под ней
  * и зазор между ними; опционально — волнистая дуга (M3 Expressive).
  *
- * Обычно это делает com.google.android.material.progressindicator.CircularProgressIndicator,
- * но зависимости com.google.android.material в дереве нет, поэтому рисуем сами теми же
- * метриками: indicatorTrackGapSize = 2dp, скруглённые торцы, волна 15/1.6/5 dp.
+ * Обычно это делает com.google.android.material.progressindicator.CircularProgressIndicator;
+ * здесь оно посчитано вручную теми же метриками: indicatorTrackGapSize = 2dp,
+ * скруглённые торцы, волна 15/1.6/5 dp.
  */
 public class M3CircularProgress {
 
     /** Стоковая отрисовка Telegram. */
     public static final int STYLE_LEGACY = 0;
-    /** См. notes. */
+    /** LoadingIndicator из M3 Expressive; рисует его сам com.google.android.material. */
     public static final int STYLE_LOADING_INDICATOR = 1;
     /** CircularProgressIndicator. */
     public static final int STYLE_CIRCULAR = 2;
@@ -38,7 +38,7 @@ public class M3CircularProgress {
         return style;
     }
 
-    /** Стиль, который мы умеем рисовать сами. Стиль 1 у нас уходит в стоковую отрисовку. */
+    /** Стиль, который считается здесь; стиль 1 рисует LoadingIndicator. */
     public static boolean isCircular(int style) {
         return style == STYLE_CIRCULAR || style == STYLE_WAVY;
     }
