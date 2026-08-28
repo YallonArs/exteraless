@@ -21,7 +21,7 @@ The special focus is **plugin security**. In exteraGram a plugin is not restrict
 
 The project is in **beta**: some exteraGram features have not been ported yet. If you notice a missing feature, open an issue or write to the channel.
 
-- Package name: `com.exteraless.app`
+- Package name: `com.yallonars.exteraless.app`
 - What has been ported: settings screens, design and chat parameters, icon packs, pill strip (Pill Stack), side menu, Python plugin engine
 
 

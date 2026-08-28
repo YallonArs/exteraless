@@ -161,7 +161,7 @@ public class OpenExteraOtherActivity extends BaseNekoSettingsActivity {
 
         // Секции Google (Analytics + Crashlytics) здесь больше нет. Отправлять
         // было нечего: shouldEnableCrashlytics требует applicationId
-        // «nu.gpu.nagram», а у нас com.exteraless.app — переключатель стоял
+        // «nu.gpu.nagram», а у нас com.yallonars.exteraless.app — переключатель стоял
         // мёртвым. На его месте вход в настройки NagramX, выключенный по
         // умолчанию.
         googleHeaderRow = addRow("googleHeader");

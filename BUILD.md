@@ -30,7 +30,7 @@ ALIAS_PASS=<пароль_ключа>
 
 Ключа в репозитории нет намеренно. Без него сборка не падает — APK подписывается отладочным ключом Android.
 
-4. Для push-уведомлений положить свой `TMessagesProj/google-services.json` (Firebase, имя пакета `com.exteraless.app`).
+4. Для push-уведомлений положить свой `TMessagesProj/google-services.json` (Firebase, имя пакета `com.yallonars.exteraless.app`).
 
 5. Заменить метаданные проекта:
    - ключ Google Maps в записи `com.google.android.maps.v2.API_KEY` в `TMessagesProj/src/main/AndroidManifest.xml`

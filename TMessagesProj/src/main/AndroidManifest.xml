@@ -378,7 +378,7 @@
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
-                <data android:mimeType="vnd.android.cursor.item/vnd.com.exteraless.app.android.profile"/>
+                <data android:mimeType="vnd.android.cursor.item/vnd.com.yallonars.exteraless.app.android.profile"/>
             </intent-filter>
             <!-- exteraless plugins: файл плагина, открытый из чата, файлового
                  менеджера или «Поделиться». Без этого фильтра система показывает
@@ -441,8 +441,8 @@
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
-                <data android:mimeType="vnd.android.cursor.item/vnd.com.exteraless.app.android.call"/>
-                <data android:mimeType="vnd.android.cursor.item/vnd.com.exteraless.app.android.call.video"/>
+                <data android:mimeType="vnd.android.cursor.item/vnd.com.yallonars.exteraless.app.android.call"/>
+                <data android:mimeType="vnd.android.cursor.item/vnd.com.yallonars.exteraless.app.android.call.video"/>
             </intent-filter>
         </activity-alias>
         <activity

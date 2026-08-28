@@ -31,7 +31,7 @@ ALIAS_PASS=<alias_password>
 
 The keystore is intentionally not in the repository. Without it, the build does not fail — the APK is signed with the Android debug key.
 
-4. For push notifications, put your own `TMessagesProj/google-services.json` (Firebase, package name `com.exteraless.app`).
+4. For push notifications, put your own `TMessagesProj/google-services.json` (Firebase, package name `com.yallonars.exteraless.app`).
 
 5. Replace project metadata:
    - Google Maps key in the `com.google.android.maps.v2.API_KEY` entry in `TMessagesProj/src/main/AndroidManifest.xml`
