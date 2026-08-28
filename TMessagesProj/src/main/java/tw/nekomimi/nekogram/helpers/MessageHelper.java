@@ -840,13 +840,12 @@ public class MessageHelper extends BaseController {
         return messageObject.messageOwner.message;
     }
 
+    // for Nagram filters
     public static CharSequence getMessagePlainTextFull(MessageObject messageObject, MessageObject.GroupedMessages messageGroup) {
         StringBuilder text = new StringBuilder();
-        if (messageGroup != null) {
-            for (var groupedMessage : messageGroup.messages) {
-                text.append(getMessagePlainText(groupedMessage, null));
-            }
-        }
+
+        text.append(messageObject.messageOwner.message);
+
         if (messageObject != null && messageObject.messageOwner != null) {
             if (messageObject.isPoll()) {
                 TLRPC.Poll poll = ((TLRPC.TL_messageMediaPoll) messageObject.messageOwner.media).poll;
@@ -858,10 +857,15 @@ public class MessageHelper extends BaseController {
                 text.append(pollText);
             } else if (!TextUtils.isEmpty(messageObject.getVoiceTranscription())) {
                 text.append(messageObject.messageOwner.voiceTranscription);
-            } else {
-                text.append(messageObject.messageOwner.message);
             }
         }
+
+        if (messageGroup != null) {
+            for (var groupedMessage : messageGroup.messages) {
+                text.append(getMessagePlainTextFullWithUrls(groupedMessage, null));
+            }
+        }
+
         return text.toString();
     }
 
@@ -873,25 +877,19 @@ public class MessageHelper extends BaseController {
 
         ArrayList<TLRPC.MessageEntity> entities = messageObject.messageOwner.entities;
         if (entities == null || entities.isEmpty()) {
-            return plainText; 
+            return plainText;
         }
 
         StringBuilder builder = new StringBuilder(plainText);
 
-        // iterate through entities in REVERSE order to prevent shifing index offsent. 
         for (int i = entities.size() - 1; i >= 0; i--) {
             TLRPC.MessageEntity entity = entities.get(i);
             
-            // check if the entity is a hidden URL
             if (entity instanceof TLRPC.TL_messageEntityTextUrl) {
-                String targetUrl = entity.url; // the underlying target URL
+                String targetUrl = entity.url;
                 
                 if (targetUrl != null) {
-                    // determine exactly where the link text ends
                     int insertPosition = entity.offset + entity.length;
-                    
-                    // insert the URL right after the formatted text
-                    // example output: "Check out this link (https://example.com) for details."
                     builder.insert(insertPosition, " (" + targetUrl + ")");
                 }
             }
