@@ -109,7 +109,7 @@ public class AyuFilter {
         }
         CharSequence messageText = null;
         if (selectedObject.type != MessageObject.TYPE_EMOJIS && selectedObject.type != MessageObject.TYPE_ANIMATED_STICKER && selectedObject.type != MessageObject.TYPE_STICKER) {
-            messageText = MessageHelper.getMessagePlainTextFull(selectedObject, selectedObjectGroup);
+            messageText = MessageHelper.getMessagePlainTextFullWithUrls(selectedObject, selectedObjectGroup);
             if (TextUtils.isEmpty(messageText) || Emoji.fullyConsistsOfEmojis(messageText)) {
                 messageText = null;
             }
