@@ -844,9 +844,9 @@ public class MessageHelper extends BaseController {
     public static CharSequence getMessagePlainTextFull(MessageObject messageObject, MessageObject.GroupedMessages messageGroup) {
         StringBuilder text = new StringBuilder();
 
-        text.append(messageObject.messageOwner.message);
-
         if (messageObject != null && messageObject.messageOwner != null) {
+            text.append(messageObject.messageOwner.message);
+
             if (messageObject.isPoll()) {
                 TLRPC.Poll poll = ((TLRPC.TL_messageMediaPoll) messageObject.messageOwner.media).poll;
                 StringBuilder pollText = new StringBuilder(poll.question.text).append("\n");
